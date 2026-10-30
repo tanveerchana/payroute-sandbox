@@ -1,0 +1,11 @@
+# PayRoute Sandbox design
+
+A portfolio payment orchestration console by Tanveer Singh. Every provider, payment and settlement is simulated. No payment networks, card details, personal data, or real funds.
+
+The implementation follows the authorized React/TypeScript/Vite frontend and Node Vercel workspace API with PostgreSQL compare-and-swap supplied by the project shared adapter. It uses a deterministic domain reducer for atomic commands. The console uses a midnight background, indigo routing paths and emerald health indicators. A left navigation exposes Overview, Transactions, Routing, Reconciliation and documentation. The main overview pairs routing topology with an interactive simulator; transaction detail exposes every attempt and reason. Responsive layouts retain the primary actions on mobile.
+
+Amounts are accepted as decimal strings and stored in integer minor units for AUD, USD, CAD and EUR. More than two decimal places are rejected. An idempotency key binds a normalized payment request; replay returns the original payment, conflicting reuse fails. Retry occurs only for simulated provider unavailability, and hard declines terminate. Provider settings affect new payments only. At 200 payments the workspace rejects new payments until an explicit reset, preserving idempotency for the workspace lifetime.
+
+Settlement reconciliation parses a bounded CSV statement, compares every successful payment, and flags missing, duplicate, unexpected, currency and amount mismatches. A generated statement intentionally contains three exceptions for demonstration. All dashboard figures derive from workspace transactions; money totals are currency scoped. Simulated timestamps and deterministic latency are identified as such.
+
+Alternatives considered: a local-only preview would be simpler but cannot provide shared concurrency guarantees; live provider integration would introduce real financial data and is outside the sandbox brief. The chosen hosted workspace reducer provides inspectable behavior without real funds. Persistence failure is shown prominently, with no silent local-state fallback. The API uses a browser-generated 256-bit bearer workspace token, never a provider credential.

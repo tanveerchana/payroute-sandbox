@@ -1,0 +1,9 @@
+# Verification
+
+The domain suite was written first and run against stubs: 13 behavior tests failed before implementation. The token lifecycle suite then failed on lack of expiration/legacy rotation before those behaviors were added. No test contacts a real payment provider.
+
+The suite covers exact decimal parsing, precision/range/type rejection, synthetic fee calculation, primary success, outage fallback, terminal hard decline, exhausted routing, request validation, idempotency replay after configuration changes, conflicting keys, provider settings and route ordering, reconciliation exceptions, malformed CSV, exact matches, formula-safe export and bounded transaction storage. Browser token tests cover stability and six-day rotation. Shared persistence tests exercise initialization, CAS retry/cloning, bounded contention, request limits, validation, isolated token headers and sanitized infrastructure errors using a simulated fetch boundary.
+
+Run `npm test`, `npm run typecheck` and `npm run build` from the repository root. Database RLS and real concurrency are deployment checks, documented in persistence.md. Automated mocked fetch tests do not prove hosted RLS. Browser smoke checks should cover all four simulator scenarios, replay, changed-request conflict, provider toggles/order, search/filter, settlement demo/import, download and narrow viewport navigation.
+
+Pagination regression coverage verifies a ledger reset from 200 to 36 records while viewing its last page still displays payments 31–36, and an empty filtered result reports the valid 0–0 range. The UI uses the tested page/range result for rows and navigation, and synchronizes its page when the ledger shrinks. Metric cards show only ledger-derived numbers; no decorative trend charts or inactive shortcut hints are displayed.
