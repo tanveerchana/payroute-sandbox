@@ -1,90 +1,1760 @@
-import {useEffect,useRef,useState} from 'react';
-import type {FormEvent,ReactNode} from 'react';
-import {ArrowDown,ArrowDownLeft,ArrowRight,ArrowUp,ArrowUpRight,Check,CheckCheck,ChevronDown,ChevronRight,Code2,Copy,CreditCard,Download,ExternalLink,FileCheck2,GitBranch,LayoutDashboard,LoaderCircle,Menu,Play,Plus,RefreshCw,Route,Search,Settings2,ShieldCheck,SlidersHorizontal,Terminal,Wallet,X,Zap,AlertCircle,Clock3,Database,CheckCircle2,ArrowLeftRight} from 'lucide-react';
-import {currencies,formatMoney,exportCsv,demoStatement} from './domain';
-import type {Currency,Payment,Provider,Scenario,Workspace} from './domain';
-import {requestWorkspace,download} from './client';
-import {paginate} from './pagination';
+import { useEffect, useRef, useState } from 'react';
+import type { FormEvent, ReactNode } from 'react';
+import {
+  ArrowDown,
+  ArrowDownLeft,
+  ArrowRight,
+  ArrowUp,
+  ArrowUpRight,
+  Check,
+  CheckCheck,
+  ChevronDown,
+  ChevronRight,
+  Code2,
+  Copy,
+  CreditCard,
+  Download,
+  ExternalLink,
+  FileCheck2,
+  GitBranch,
+  LayoutDashboard,
+  LoaderCircle,
+  Menu,
+  Play,
+  Plus,
+  RefreshCw,
+  Route,
+  Search,
+  Settings2,
+  ShieldCheck,
+  SlidersHorizontal,
+  Terminal,
+  Wallet,
+  X,
+  Zap,
+  AlertCircle,
+  Clock3,
+  Database,
+  CheckCircle2,
+  ArrowLeftRight,
+} from 'lucide-react';
+import { currencies, formatMoney, exportCsv, demoStatement } from './domain';
+import type { Currency, Payment, Provider, Scenario, Workspace } from './domain';
+import { requestWorkspace, download } from './client';
+import { paginate } from './pagination';
 
-type Page='Overview'|'Transactions'|'Routing'|'Reconciliation'|'Developer guide';
-const pages: {name:Page;icon:typeof Route}[]=[{name:'Overview',icon:LayoutDashboard},{name:'Transactions',icon:ArrowLeftRight},{name:'Routing',icon:GitBranch},{name:'Reconciliation',icon:FileCheck2}];
-const scenarioNames:Record<Scenario,string>={success:'Successful payment',primary_outage:'Primary provider outage',hard_decline:'Hard decline',all_down:'All providers unavailable'};
-const providerClass:Record<string,string>={atlas:'indigo',pulse:'cyan',harbor:'amber'};
-const newKey=()=>`sim_${crypto.randomUUID().replaceAll('-','').slice(0,20)}`;
-const shortId=(id:string)=>id.replace('pay_','py_');
-function App(){
- const [page,setPage]=useState<Page>('Overview');const [state,setState]=useState<Workspace|null>(null);const [revision,setRevision]=useState(0);const [busy,setBusy]=useState(false);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [notice,setNotice]=useState('');const [detail,setDetail]=useState<Payment|null>(null);const [mobile,setMobile]=useState(false);const [displayCurrency,setDisplayCurrency]=useState<Currency>('AUD');const [confirmReset,setConfirmReset]=useState(false);
- const noticeTimer=useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
- const toast=(message:string)=>{setNotice(message);clearTimeout(noticeTimer.current);noticeTimer.current=setTimeout(()=>setNotice(''),5000);};
- async function load(){setLoading(true);setError('');try{const data=await requestWorkspace();setState(data.state);setRevision(data.revision);}catch(e){setError((e as Error).message);}finally{setLoading(false);}}
- useEffect(()=>{void load();return()=>clearTimeout(noticeTimer.current);},[]);
- async function command(cmd:Record<string,unknown>){setBusy(true);setError('');try{const data=await requestWorkspace(cmd);setState(data.state);setRevision(data.revision);return data;}catch(e){setError((e as Error).message);return null;}finally{setBusy(false);}}
- const navigate=(next:Page)=>{setPage(next);setMobile(false);};
- const all=state?.transactions??[];const successes=all.filter(p=>p.status==='succeeded');const scoped=successes.filter(p=>p.currency===displayCurrency);const volume=scoped.reduce((n,p)=>n+p.amountMinor,0);const successRate=all.length?successes.length/all.length*100:0;const fallbackCount=successes.filter(p=>p.attempts.length>1).length;const latency=all.length?Math.round(all.reduce((n,p)=>n+p.latencyMs,0)/all.length):0;
- return <div className="app-shell">
- <aside className={`sidebar ${mobile?'mobile-open':''}`}>
-  <a className="brand" href="#" onClick={e=>{e.preventDefault();navigate('Overview');}}><span className="brand-symbol"><Route size={22}/></span>PayRoute<span className="brand-dot">.</span></a>
-  <div className="workspace-switch"><span className="workspace-icon">TS</span><span>Tanveer’s workspace<small>Personal sandbox</small></span><ChevronDown size={14}/></div>
-  <div className="nav-label">WORKSPACE</div>
-  <nav>{pages.map(({name,icon:Icon})=><button key={name} className={`nav-item ${page===name?'active':''}`} onClick={()=>navigate(name)}><Icon size={18}/>{name}{name==='Transactions'&&<span className="nav-count">{all.length||'—'}</span>}</button>)}</nav>
-  <div className="nav-label developer-label">RESOURCES</div>
-  <button className={`nav-item ${page==='Developer guide'?'active':''}`} onClick={()=>navigate('Developer guide')}><Code2 size={18}/>Developer guide<ArrowUpRight size={14} className="end-icon"/></button>
-  <a className="nav-item" href="https://github.com/tanveerchana" target="_blank" rel="noreferrer"><Terminal size={18}/>GitHub<ArrowUpRight size={14} className="end-icon"/></a>
-  <div className="sidebar-bottom"><div className="sandbox-note"><div className="mini-shield"><ShieldCheck size={19}/></div><strong>A safe place to experiment</strong><p>Synthetic payments. Real engineering. No money moves.</p><span><i/>Sandbox environment</span></div><a className="profile" href="https://singhtanveer.com" target="_blank" rel="noreferrer"><span className="avatar">TS</span><span>Tanveer Singh<small>Builder & software engineer</small></span><ExternalLink size={14}/></a></div>
- </aside>
- {mobile&&<div className="nav-backdrop" onClick={()=>setMobile(false)}/>}
- <div className="main-shell">
- <header className="topbar"><div className="breadcrumb"><button className="icon-button mobile-menu" aria-label="Open navigation" onClick={()=>setMobile(!mobile)}><Menu size={20}/></button><span>Workspace</span><ChevronRight size={13}/><strong>{page}</strong></div><div className="topbar-right"><span className="env-badge"><span/>SANDBOX</span><span className="topbar-divider"/><a href="https://singhtanveer.com" target="_blank" rel="noreferrer" className="avatar small">TS</a></div></header>
- <main>
- <div className="page-heading"><div><div className="eyebrow">PAYMENT ORCHESTRATION LAB</div><h1>{page==='Overview'?'Every payment. The right route.':page}</h1><p>{page==='Overview'?'A clear view of your payment flow, from the first attempt to settlement.':page==='Transactions'?'Every synthetic payment, every decision, all in one place.':page==='Routing'?'Control provider priority and test how your routing responds.':page==='Reconciliation'?'Close the loop between successful payments and simulated settlements.':'Explore the engineering behind this sandbox.'}</p></div><div className="heading-actions"><span className={`connection ${state?'connected':''}`}><i/>{loading?'Connecting…':state?'Workspace connected':'Connection unavailable'}</span><button className="button secondary compact" disabled={loading||busy} onClick={()=>void load()} aria-label="Refresh workspace"><RefreshCw size={15} className={loading?'spin':''}/></button><button className="button secondary" disabled={!state} onClick={()=>{download('payroute-workspace.json',JSON.stringify({sandbox:true,revision,state},null,2));toast('Workspace JSON exported.');}}><Download size={15}/>Export<span className="hide-small"> data</span></button></div></div>
- {error&&<div className="error-banner" role="alert"><AlertCircle size={18}/><span><strong>Workspace action unavailable.</strong> {error}</span><button className="text-button" onClick={()=>void load()}>Retry connection</button></div>}
- {!state?<div className="empty-workspace"><div className="empty-icon">{loading?<LoaderCircle className="spin" size={32}/>:<Database size={32}/>}</div><h2>{loading?'Connecting your sandbox':'Your workspace needs a connection'}</h2><p>{loading?'Loading the synthetic ledger and routing configuration.':'The workspace API could not load. Check the database connection and retry to start exploring.'}</p>{!loading&&<button className="button primary" onClick={()=>void load()}><RefreshCw size={16}/>Try again</button>}<div className="empty-pills"><span><ShieldCheck size={14}/>No real funds</span><span><GitBranch size={14}/>Three simulated providers</span><span><CheckCheck size={14}/>Idempotent requests</span></div></div>:<>
- {(page==='Overview'||page==='Transactions')&&<section className="kpi-grid" aria-label="Workspace metrics"><Metric label="Processed volume" value={formatMoney(volume,displayCurrency)} icon={<Wallet size={18}/>} foot={<><span className="metric-currency"><select aria-label="Metric currency" value={displayCurrency} onChange={e=>setDisplayCurrency(e.target.value as Currency)}>{currencies.map(c=><option key={c}>{c}</option>)}</select></span>{scoped.length} approved payments</>}/><Metric label="Authorization rate" value={`${successRate.toFixed(1)}%`} icon={<ShieldCheck size={18}/>} foot={<><span className="green">{successes.length} successful</span><span>of {all.length} total</span></>}/><Metric label="Fallback recoveries" value={String(fallbackCount).padStart(2,'0')} icon={<GitBranch size={18}/>} foot={<><span className="green"><ArrowUpRight size={12}/>Recovered</span><span>after provider outage</span></>}/><Metric label="Avg. simulated latency" value={<>{latency}<small>ms</small></>} icon={<Zap size={18}/>} foot={<><span className="muted">End-to-end</span><span>all payment attempts</span></>}/></section>}
- {page==='Overview'&&<><div className="overview-grid"><Topology providers={state.providers} latest={all.at(-1)!} onConfigure={()=>navigate('Routing')}/><Simulator busy={busy} onRun={async cmd=>{const data=await command(cmd);if(data?.result?.payment){setDetail(data.result.payment);toast(data.result.replayed?'Original payment returned. No new attempts created.':'Sandbox payment simulated.');}return !!data;}}/></div><TransactionTable transactions={all} overview onSelect={setDetail} onViewAll={()=>navigate('Transactions')} onExport={()=>download('payroute-transactions.csv',exportCsv(all),'text/csv')}/></>}
- {page==='Transactions'&&<TransactionTable transactions={all} onSelect={setDetail} onExport={()=>download('payroute-transactions.csv',exportCsv(all),'text/csv')}/>}
- {page==='Routing'&&<><div className="routing-intro"><div><GitBranch size={18}/><strong>Priority-based routing</strong><span>Try in order. Fall back on unavailability. Stop on a hard decline.</span></div><span className="pill indigo">Deterministic engine</span></div><div className="routing-layout"><div className="provider-list">{state.providers.map((p,i)=><ProviderCard key={p.id} provider={p} index={i} busy={busy} onChange={(enabled,outage)=>void command({type:'provider',id:p.id,enabled,outage})} onMove={direction=>{const order=state.providers.map(p=>p.id);[order[i],order[i+direction]]=[order[i+direction],order[i]];void command({type:'route',order});}}/>)}</div><div><Topology providers={state.providers} latest={all.at(-1)!}/><div className="info-card"><ShieldCheck size={19}/><div><strong>Changes apply to the next payment</strong><p>Existing attempts and idempotency replays keep their original result. Provider fees are synthetic, charged only on approved payments.</p></div></div></div></div><div className="routing-bottom"><Simulator busy={busy} onRun={async cmd=>{const data=await command(cmd);if(data?.result?.payment)setDetail(data.result.payment);return !!data;}}/><div className="panel rules-panel"><div className="panel-heading"><h2>Built for predictable behavior</h2><span className="pill">ROUTING RULES</span></div><Rule number="01" title="Try enabled providers in order" body="Disabled providers are skipped entirely. Your priority list decides which active provider receives the first attempt."/><Rule number="02" title="Retry only when it is safe" body="A simulated timeout moves to the next provider. A hard decline is terminal and is never sent to another provider."/><Rule number="03" title="One key, one payment" body="Reusing an idempotency key returns the original result. Changing the request with the same key produces a conflict."/></div></div></>}
- {page==='Reconciliation'&&<ReconciliationView state={state} busy={busy} onCommand={command} toast={toast}/>}
- {page==='Developer guide'&&<Guide/>}
- <footer className="footer"><span><ShieldCheck size={13}/>Sandbox only · Synthetic data · No real funds or payment networks</span><button className="text-button" onClick={()=>setConfirmReset(true)} disabled={busy}>Reset sandbox<RefreshCw size={12}/></button><span className="footer-author">Built by <a href="https://singhtanveer.com" target="_blank" rel="noreferrer">Tanveer Singh<ArrowUpRight size={11}/></a></span></footer>
- </>}
- </main></div>
- {notice&&<div className="toast" role="status"><CheckCircle2 size={17}/>{notice}<button className="icon-button" aria-label="Dismiss notification" onClick={()=>setNotice('')}><X size={14}/></button></div>}
- {detail&&<PaymentDetail payment={detail} onClose={()=>setDetail(null)} onCopy={async text=>{try{await navigator.clipboard.writeText(text);toast('Copied to clipboard.');}catch{toast('Clipboard unavailable. Select the value to copy.');}}}/>}
- {confirmReset&&<div className="modal-backdrop" onClick={()=>setConfirmReset(false)}><div className="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="reset-title" onClick={e=>e.stopPropagation()}><div className="empty-icon"><RefreshCw size={24}/></div><h2 id="reset-title">Reset this sandbox?</h2><p>Your simulations, provider settings and reconciliation results will be replaced by the original 36 synthetic payments. Idempotency history will also restart.</p><div><button className="button secondary" onClick={()=>setConfirmReset(false)}>Keep exploring</button><button className="button primary" disabled={busy} onClick={async()=>{const data=await command({type:'reset'});if(data){setConfirmReset(false);toast('Sandbox reset to the original dataset.');}}}>Reset sandbox</button></div></div></div>}
- </div>;
+type Page = 'Overview' | 'Transactions' | 'Routing' | 'Reconciliation' | 'Developer guide';
+const pages: { name: Page; icon: typeof Route }[] = [
+  { name: 'Overview', icon: LayoutDashboard },
+  { name: 'Transactions', icon: ArrowLeftRight },
+  { name: 'Routing', icon: GitBranch },
+  { name: 'Reconciliation', icon: FileCheck2 },
+];
+const scenarioNames: Record<Scenario, string> = {
+  success: 'Successful payment',
+  primary_outage: 'Primary provider outage',
+  hard_decline: 'Hard decline',
+  all_down: 'All providers unavailable',
+};
+const providerClass: Record<string, string> = { atlas: 'indigo', pulse: 'cyan', harbor: 'amber' };
+const newKey = () => `sim_${crypto.randomUUID().replaceAll('-', '').slice(0, 20)}`;
+const shortId = (id: string) => id.replace('pay_', 'py_');
+function App() {
+  const [page, setPage] = useState<Page>('Overview');
+  const [state, setState] = useState<Workspace | null>(null);
+  const [revision, setRevision] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [detail, setDetail] = useState<Payment | null>(null);
+  const [mobile, setMobile] = useState(false);
+  const [displayCurrency, setDisplayCurrency] = useState<Currency>('AUD');
+  const [confirmReset, setConfirmReset] = useState(false);
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const toast = (message: string) => {
+    setNotice(message);
+    clearTimeout(noticeTimer.current);
+    noticeTimer.current = setTimeout(() => setNotice(''), 5000);
+  };
+  async function load() {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await requestWorkspace();
+      setState(data.state);
+      setRevision(data.revision);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => {
+    void load();
+    return () => clearTimeout(noticeTimer.current);
+  }, []);
+  async function command(cmd: Record<string, unknown>) {
+    setBusy(true);
+    setError('');
+    try {
+      const data = await requestWorkspace(cmd);
+      setState(data.state);
+      setRevision(data.revision);
+      return data;
+    } catch (e) {
+      setError((e as Error).message);
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  }
+  const navigate = (next: Page) => {
+    setPage(next);
+    setMobile(false);
+  };
+  const all = state?.transactions ?? [];
+  const successes = all.filter((p) => p.status === 'succeeded');
+  const scoped = successes.filter((p) => p.currency === displayCurrency);
+  const volume = scoped.reduce((n, p) => n + p.amountMinor, 0);
+  const successRate = all.length ? (successes.length / all.length) * 100 : 0;
+  const fallbackCount = successes.filter((p) => p.attempts.length > 1).length;
+  const latency = all.length
+    ? Math.round(all.reduce((n, p) => n + p.latencyMs, 0) / all.length)
+    : 0;
+  return (
+    <div className="app-shell">
+      <aside className={`sidebar ${mobile ? 'mobile-open' : ''}`}>
+        <a
+          className="brand"
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            navigate('Overview');
+          }}
+        >
+          <span className="brand-symbol">
+            <Route size={22} />
+          </span>
+          PayRoute<span className="brand-dot">.</span>
+        </a>
+        <div className="workspace-switch">
+          <span className="workspace-icon">TS</span>
+          <span>
+            Tanveer’s workspace<small>Personal sandbox</small>
+          </span>
+          <ChevronDown size={14} />
+        </div>
+        <div className="nav-label">WORKSPACE</div>
+        <nav>
+          {pages.map(({ name, icon: Icon }) => (
+            <button
+              key={name}
+              className={`nav-item ${page === name ? 'active' : ''}`}
+              onClick={() => navigate(name)}
+            >
+              <Icon size={18} />
+              {name}
+              {name === 'Transactions' && <span className="nav-count">{all.length || '—'}</span>}
+            </button>
+          ))}
+        </nav>
+        <div className="nav-label developer-label">RESOURCES</div>
+        <button
+          className={`nav-item ${page === 'Developer guide' ? 'active' : ''}`}
+          onClick={() => navigate('Developer guide')}
+        >
+          <Code2 size={18} />
+          Developer guide
+          <ArrowUpRight size={14} className="end-icon" />
+        </button>
+        <a
+          className="nav-item"
+          href="https://github.com/tanveerchana"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <Terminal size={18} />
+          GitHub
+          <ArrowUpRight size={14} className="end-icon" />
+        </a>
+        <div className="sidebar-bottom">
+          <div className="sandbox-note">
+            <div className="mini-shield">
+              <ShieldCheck size={19} />
+            </div>
+            <strong>A safe place to experiment</strong>
+            <p>Synthetic payments. Real engineering. No money moves.</p>
+            <span>
+              <i />
+              Sandbox environment
+            </span>
+          </div>
+          <a className="profile" href="https://singhtanveer.com" target="_blank" rel="noreferrer">
+            <span className="avatar">TS</span>
+            <span>
+              Tanveer Singh<small>Builder & software engineer</small>
+            </span>
+            <ExternalLink size={14} />
+          </a>
+        </div>
+      </aside>
+      {mobile && <div className="nav-backdrop" onClick={() => setMobile(false)} />}
+      <div className="main-shell">
+        <header className="topbar">
+          <div className="breadcrumb">
+            <button
+              className="icon-button mobile-menu"
+              aria-label="Open navigation"
+              onClick={() => setMobile(!mobile)}
+            >
+              <Menu size={20} />
+            </button>
+            <span>Workspace</span>
+            <ChevronRight size={13} />
+            <strong>{page}</strong>
+          </div>
+          <div className="topbar-right">
+            <span className="env-badge">
+              <span />
+              SANDBOX
+            </span>
+            <span className="topbar-divider" />
+            <a
+              href="https://singhtanveer.com"
+              target="_blank"
+              rel="noreferrer"
+              className="avatar small"
+            >
+              TS
+            </a>
+          </div>
+        </header>
+        <main>
+          <div className="page-heading">
+            <div>
+              <div className="eyebrow">PAYMENT ORCHESTRATION LAB</div>
+              <h1>{page === 'Overview' ? 'Every payment. The right route.' : page}</h1>
+              <p>
+                {page === 'Overview'
+                  ? 'A clear view of your payment flow, from the first attempt to settlement.'
+                  : page === 'Transactions'
+                    ? 'Every synthetic payment, every decision, all in one place.'
+                    : page === 'Routing'
+                      ? 'Control provider priority and test how your routing responds.'
+                      : page === 'Reconciliation'
+                        ? 'Close the loop between successful payments and simulated settlements.'
+                        : 'Explore the engineering behind this sandbox.'}
+              </p>
+            </div>
+            <div className="heading-actions">
+              <span className={`connection ${state ? 'connected' : ''}`}>
+                <i />
+                {loading ? 'Connecting…' : state ? 'Workspace connected' : 'Connection unavailable'}
+              </span>
+              <button
+                className="button secondary compact"
+                disabled={loading || busy}
+                onClick={() => void load()}
+                aria-label="Refresh workspace"
+              >
+                <RefreshCw size={15} className={loading ? 'spin' : ''} />
+              </button>
+              <button
+                className="button secondary"
+                disabled={!state}
+                onClick={() => {
+                  download(
+                    'payroute-workspace.json',
+                    JSON.stringify({ sandbox: true, revision, state }, null, 2),
+                  );
+                  toast('Workspace JSON exported.');
+                }}
+              >
+                <Download size={15} />
+                Export<span className="hide-small"> data</span>
+              </button>
+            </div>
+          </div>
+          {error && (
+            <div className="error-banner" role="alert">
+              <AlertCircle size={18} />
+              <span>
+                <strong>Workspace action unavailable.</strong> {error}
+              </span>
+              <button className="text-button" onClick={() => void load()}>
+                Retry connection
+              </button>
+            </div>
+          )}
+          {!state ? (
+            <div className="empty-workspace">
+              <div className="empty-icon">
+                {loading ? <LoaderCircle className="spin" size={32} /> : <Database size={32} />}
+              </div>
+              <h2>{loading ? 'Connecting your sandbox' : 'Your workspace needs a connection'}</h2>
+              <p>
+                {loading
+                  ? 'Loading the synthetic ledger and routing configuration.'
+                  : 'The workspace API could not load. Check the database connection and retry to start exploring.'}
+              </p>
+              {!loading && (
+                <button className="button primary" onClick={() => void load()}>
+                  <RefreshCw size={16} />
+                  Try again
+                </button>
+              )}
+              <div className="empty-pills">
+                <span>
+                  <ShieldCheck size={14} />
+                  No real funds
+                </span>
+                <span>
+                  <GitBranch size={14} />
+                  Three simulated providers
+                </span>
+                <span>
+                  <CheckCheck size={14} />
+                  Idempotent requests
+                </span>
+              </div>
+            </div>
+          ) : (
+            <>
+              {(page === 'Overview' || page === 'Transactions') && (
+                <section className="kpi-grid" aria-label="Workspace metrics">
+                  <Metric
+                    label="Processed volume"
+                    value={formatMoney(volume, displayCurrency)}
+                    icon={<Wallet size={18} />}
+                    foot={
+                      <>
+                        <span className="metric-currency">
+                          <select
+                            aria-label="Metric currency"
+                            value={displayCurrency}
+                            onChange={(e) => setDisplayCurrency(e.target.value as Currency)}
+                          >
+                            {currencies.map((c) => (
+                              <option key={c}>{c}</option>
+                            ))}
+                          </select>
+                        </span>
+                        {scoped.length} approved payments
+                      </>
+                    }
+                  />
+                  <Metric
+                    label="Authorization rate"
+                    value={`${successRate.toFixed(1)}%`}
+                    icon={<ShieldCheck size={18} />}
+                    foot={
+                      <>
+                        <span className="green">{successes.length} successful</span>
+                        <span>of {all.length} total</span>
+                      </>
+                    }
+                  />
+                  <Metric
+                    label="Fallback recoveries"
+                    value={String(fallbackCount).padStart(2, '0')}
+                    icon={<GitBranch size={18} />}
+                    foot={
+                      <>
+                        <span className="green">
+                          <ArrowUpRight size={12} />
+                          Recovered
+                        </span>
+                        <span>after provider outage</span>
+                      </>
+                    }
+                  />
+                  <Metric
+                    label="Avg. simulated latency"
+                    value={
+                      <>
+                        {latency}
+                        <small>ms</small>
+                      </>
+                    }
+                    icon={<Zap size={18} />}
+                    foot={
+                      <>
+                        <span className="muted">End-to-end</span>
+                        <span>all payment attempts</span>
+                      </>
+                    }
+                  />
+                </section>
+              )}
+              {page === 'Overview' && (
+                <>
+                  <div className="overview-grid">
+                    <Topology
+                      providers={state.providers}
+                      latest={all.at(-1)!}
+                      onConfigure={() => navigate('Routing')}
+                    />
+                    <Simulator
+                      busy={busy}
+                      onRun={async (cmd) => {
+                        const data = await command(cmd);
+                        if (data?.result?.payment) {
+                          setDetail(data.result.payment);
+                          toast(
+                            data.result.replayed
+                              ? 'Original payment returned. No new attempts created.'
+                              : 'Sandbox payment simulated.',
+                          );
+                        }
+                        return !!data;
+                      }}
+                    />
+                  </div>
+                  <TransactionTable
+                    transactions={all}
+                    overview
+                    onSelect={setDetail}
+                    onViewAll={() => navigate('Transactions')}
+                    onExport={() =>
+                      download('payroute-transactions.csv', exportCsv(all), 'text/csv')
+                    }
+                  />
+                </>
+              )}
+              {page === 'Transactions' && (
+                <TransactionTable
+                  transactions={all}
+                  onSelect={setDetail}
+                  onExport={() => download('payroute-transactions.csv', exportCsv(all), 'text/csv')}
+                />
+              )}
+              {page === 'Routing' && (
+                <>
+                  <div className="routing-intro">
+                    <div>
+                      <GitBranch size={18} />
+                      <strong>Priority-based routing</strong>
+                      <span>
+                        Try in order. Fall back on unavailability. Stop on a hard decline.
+                      </span>
+                    </div>
+                    <span className="pill indigo">Deterministic engine</span>
+                  </div>
+                  <div className="routing-layout">
+                    <div className="provider-list">
+                      {state.providers.map((p, i) => (
+                        <ProviderCard
+                          key={p.id}
+                          provider={p}
+                          index={i}
+                          busy={busy}
+                          onChange={(enabled, outage) =>
+                            void command({ type: 'provider', id: p.id, enabled, outage })
+                          }
+                          onMove={(direction) => {
+                            const order = state.providers.map((p) => p.id);
+                            [order[i], order[i + direction]] = [order[i + direction], order[i]];
+                            void command({ type: 'route', order });
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <div>
+                      <Topology providers={state.providers} latest={all.at(-1)!} />
+                      <div className="info-card">
+                        <ShieldCheck size={19} />
+                        <div>
+                          <strong>Changes apply to the next payment</strong>
+                          <p>
+                            Existing attempts and idempotency replays keep their original result.
+                            Provider fees are synthetic, charged only on approved payments.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="routing-bottom">
+                    <Simulator
+                      busy={busy}
+                      onRun={async (cmd) => {
+                        const data = await command(cmd);
+                        if (data?.result?.payment) setDetail(data.result.payment);
+                        return !!data;
+                      }}
+                    />
+                    <div className="panel rules-panel">
+                      <div className="panel-heading">
+                        <h2>Built for predictable behavior</h2>
+                        <span className="pill">ROUTING RULES</span>
+                      </div>
+                      <Rule
+                        number="01"
+                        title="Try enabled providers in order"
+                        body="Disabled providers are skipped entirely. Your priority list decides which active provider receives the first attempt."
+                      />
+                      <Rule
+                        number="02"
+                        title="Retry only when it is safe"
+                        body="A simulated timeout moves to the next provider. A hard decline is terminal and is never sent to another provider."
+                      />
+                      <Rule
+                        number="03"
+                        title="One key, one payment"
+                        body="Reusing an idempotency key returns the original result. Changing the request with the same key produces a conflict."
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+              {page === 'Reconciliation' && (
+                <ReconciliationView state={state} busy={busy} onCommand={command} toast={toast} />
+              )}
+              {page === 'Developer guide' && <Guide />}
+              <footer className="footer">
+                <span>
+                  <ShieldCheck size={13} />
+                  Sandbox only · Synthetic data · No real funds or payment networks
+                </span>
+                <button
+                  className="text-button"
+                  onClick={() => setConfirmReset(true)}
+                  disabled={busy}
+                >
+                  Reset sandbox
+                  <RefreshCw size={12} />
+                </button>
+                <span className="footer-author">
+                  Built by{' '}
+                  <a href="https://singhtanveer.com" target="_blank" rel="noreferrer">
+                    Tanveer Singh
+                    <ArrowUpRight size={11} />
+                  </a>
+                </span>
+              </footer>
+            </>
+          )}
+        </main>
+      </div>
+      {notice && (
+        <div className="toast" role="status">
+          <CheckCircle2 size={17} />
+          {notice}
+          <button
+            className="icon-button"
+            aria-label="Dismiss notification"
+            onClick={() => setNotice('')}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+      {detail && (
+        <PaymentDetail
+          payment={detail}
+          onClose={() => setDetail(null)}
+          onCopy={async (text) => {
+            try {
+              await navigator.clipboard.writeText(text);
+              toast('Copied to clipboard.');
+            } catch {
+              toast('Clipboard unavailable. Select the value to copy.');
+            }
+          }}
+        />
+      )}
+      {confirmReset && (
+        <div className="modal-backdrop" onClick={() => setConfirmReset(false)}>
+          <div
+            className="confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reset-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="empty-icon">
+              <RefreshCw size={24} />
+            </div>
+            <h2 id="reset-title">Reset this sandbox?</h2>
+            <p>
+              Your simulations, provider settings and reconciliation results will be replaced by the
+              original 36 synthetic payments. Idempotency history will also restart.
+            </p>
+            <div>
+              <button className="button secondary" onClick={() => setConfirmReset(false)}>
+                Keep exploring
+              </button>
+              <button
+                className="button primary"
+                disabled={busy}
+                onClick={async () => {
+                  const data = await command({ type: 'reset' });
+                  if (data) {
+                    setConfirmReset(false);
+                    toast('Sandbox reset to the original dataset.');
+                  }
+                }}
+              >
+                Reset sandbox
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
-function Metric({label,value,icon,foot}:{label:string;value:ReactNode;icon:ReactNode;foot:ReactNode}){
- return <article className="metric-card"><div className="metric-top"><span>{label}</span><span className="metric-icon">{icon}</span></div><div className="metric-value">{value}</div><div className="metric-foot">{foot}</div></article>;
+function Metric({
+  label,
+  value,
+  icon,
+  foot,
+}: {
+  label: string;
+  value: ReactNode;
+  icon: ReactNode;
+  foot: ReactNode;
+}) {
+  return (
+    <article className="metric-card">
+      <div className="metric-top">
+        <span>{label}</span>
+        <span className="metric-icon">{icon}</span>
+      </div>
+      <div className="metric-value">{value}</div>
+      <div className="metric-foot">{foot}</div>
+    </article>
+  );
 }
-function Topology({providers,latest,onConfigure}:{providers:Provider[];latest:Payment;onConfigure?:()=>void}){
- const enabled=providers.filter(p=>p.enabled&&!p.outage).length;
- return <section className="panel topology-panel"><div className="panel-heading"><div><h2>Routing topology<span className="live-dot"/></h2><p>One integration. Multiple paths to success.</p></div>{onConfigure?<button className="button ghost" onClick={onConfigure}><Settings2 size={14}/>Configure<ChevronRight size={13}/></button>:<span className="pill">{enabled}/3 AVAILABLE</span>}</div><div className="topology-canvas"><div className="canvas-caption"><span className="tiny-dot"/>PRIORITY ROUTING <span>v1.0</span></div><svg className="topology-lines" viewBox="0 0 720 242" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="flow" x1="0" x2="1"><stop stopColor="#6863e4"/><stop offset="1" stopColor="#a89eff"/></linearGradient></defs><path className="flow-path" d="M125 118 H265"/><path className="flow-path" d="M390 118 H433 Q450 118 450 101 V55 Q450 40 470 40 H520"/><path className="flow-path secondary-path" d="M390 118 H520"/><path className="flow-path secondary-path" d="M390 118 H433 Q450 118 450 135 V183 Q450 198 470 198 H520"/><circle className="flow-orb" cx="205" cy="118" r="3"/><circle cx="488" cy="40" r="3" fill="#a399ff"/></svg><div className="graph-node incoming-node"><div className="graph-node-icon"><CreditCard size={20}/></div><strong>Payment</strong><span>Incoming request</span></div><div className="edge-label">idempotent</div><div className="graph-node engine-node"><div className="engine-icon"><Route size={24}/></div><strong>PayRoute</strong><span>Routing engine</span><i className="node-port left"/><i className="node-port right"/></div><div className="provider-nodes">{providers.map((p,i)=><div className={`provider-node ${p.enabled?'':'disabled'}`} key={p.id}><span className={`provider-mark ${providerClass[p.id]}`}>{p.id==='atlas'?<span className="atlas-logo">Λ</span>:p.id==='pulse'?<Zap size={17}/>:<span className="harbor-logo">H</span>}</span><div><strong>{p.name}</strong><span>{i===0?'Primary':`Fallback ${i}`}</span></div><span className={`provider-state ${p.outage?'down':!p.enabled?'off':''}`}/></div>)}</div></div><div className="topology-legend"><span><i className="legend-line"/>Primary route</span><span><i className="legend-line dashed"/>Fallback route</span><span className="topology-healthy"><i/>{enabled===3?'All providers operational':`${enabled} providers available`}</span></div><div className="route-insight"><div className="insight-icon"><GitBranch size={16}/></div><p><strong>Automatic failover, by design.</strong> Unavailable providers trigger the next route. Hard declines stop safely.</p><ShieldCheck size={19}/></div><div className="latest-route"><span>LAST ROUTE</span><code>{shortId(latest.id)}</code><span>{latest.attempts.map(a=>providers.find(p=>p.id===a.providerId)?.name).join(' → ')||'No enabled providers'}</span><span className={`mini-status ${latest.status==='succeeded'?'green':'amber'}`}>{latest.status==='succeeded'?<Check size={12}/>:<AlertCircle size={12}/>} {latest.status}</span></div></section>;
+function Topology({
+  providers,
+  latest,
+  onConfigure,
+}: {
+  providers: Provider[];
+  latest: Payment;
+  onConfigure?: () => void;
+}) {
+  const enabled = providers.filter((p) => p.enabled && !p.outage).length;
+  return (
+    <section className="panel topology-panel">
+      <div className="panel-heading">
+        <div>
+          <h2>
+            Routing topology
+            <span className="live-dot" />
+          </h2>
+          <p>One integration. Multiple paths to success.</p>
+        </div>
+        {onConfigure ? (
+          <button className="button ghost" onClick={onConfigure}>
+            <Settings2 size={14} />
+            Configure
+            <ChevronRight size={13} />
+          </button>
+        ) : (
+          <span className="pill">{enabled}/3 AVAILABLE</span>
+        )}
+      </div>
+      <div className="topology-canvas">
+        <div className="canvas-caption">
+          <span className="tiny-dot" />
+          PRIORITY ROUTING <span>v1.0</span>
+        </div>
+        <svg
+          className="topology-lines"
+          viewBox="0 0 720 242"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <defs>
+            <linearGradient id="flow" x1="0" x2="1">
+              <stop stopColor="#6863e4" />
+              <stop offset="1" stopColor="#a89eff" />
+            </linearGradient>
+          </defs>
+          <path className="flow-path" d="M125 118 H265" />
+          <path className="flow-path" d="M390 118 H433 Q450 118 450 101 V55 Q450 40 470 40 H520" />
+          <path className="flow-path secondary-path" d="M390 118 H520" />
+          <path
+            className="flow-path secondary-path"
+            d="M390 118 H433 Q450 118 450 135 V183 Q450 198 470 198 H520"
+          />
+          <circle className="flow-orb" cx="205" cy="118" r="3" />
+          <circle cx="488" cy="40" r="3" fill="#a399ff" />
+        </svg>
+        <div className="graph-node incoming-node">
+          <div className="graph-node-icon">
+            <CreditCard size={20} />
+          </div>
+          <strong>Payment</strong>
+          <span>Incoming request</span>
+        </div>
+        <div className="edge-label">idempotent</div>
+        <div className="graph-node engine-node">
+          <div className="engine-icon">
+            <Route size={24} />
+          </div>
+          <strong>PayRoute</strong>
+          <span>Routing engine</span>
+          <i className="node-port left" />
+          <i className="node-port right" />
+        </div>
+        <div className="provider-nodes">
+          {providers.map((p, i) => (
+            <div className={`provider-node ${p.enabled ? '' : 'disabled'}`} key={p.id}>
+              <span className={`provider-mark ${providerClass[p.id]}`}>
+                {p.id === 'atlas' ? (
+                  <span className="atlas-logo">Λ</span>
+                ) : p.id === 'pulse' ? (
+                  <Zap size={17} />
+                ) : (
+                  <span className="harbor-logo">H</span>
+                )}
+              </span>
+              <div>
+                <strong>{p.name}</strong>
+                <span>{i === 0 ? 'Primary' : `Fallback ${i}`}</span>
+              </div>
+              <span className={`provider-state ${p.outage ? 'down' : !p.enabled ? 'off' : ''}`} />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="topology-legend">
+        <span>
+          <i className="legend-line" />
+          Primary route
+        </span>
+        <span>
+          <i className="legend-line dashed" />
+          Fallback route
+        </span>
+        <span className="topology-healthy">
+          <i />
+          {enabled === 3 ? 'All providers operational' : `${enabled} providers available`}
+        </span>
+      </div>
+      <div className="route-insight">
+        <div className="insight-icon">
+          <GitBranch size={16} />
+        </div>
+        <p>
+          <strong>Automatic failover, by design.</strong> Unavailable providers trigger the next
+          route. Hard declines stop safely.
+        </p>
+        <ShieldCheck size={19} />
+      </div>
+      <div className="latest-route">
+        <span>LAST ROUTE</span>
+        <code>{shortId(latest.id)}</code>
+        <span>
+          {latest.attempts
+            .map((a) => providers.find((p) => p.id === a.providerId)?.name)
+            .join(' → ') || 'No enabled providers'}
+        </span>
+        <span className={`mini-status ${latest.status === 'succeeded' ? 'green' : 'amber'}`}>
+          {latest.status === 'succeeded' ? <Check size={12} /> : <AlertCircle size={12} />}{' '}
+          {latest.status}
+        </span>
+      </div>
+    </section>
+  );
 }
-function Simulator({busy,onRun}:{busy:boolean;onRun:(cmd:Record<string,unknown>)=>Promise<boolean>}){
- const [amount,setAmount]=useState('129.00');const [currency,setCurrency]=useState<Currency>('AUD');const [scenario,setScenario]=useState<Scenario>('success');const [reference,setReference]=useState('Sandbox order');const [key,setKey]=useState(newKey);const [advanced,setAdvanced]=useState(false);const [ran,setRan]=useState(false);const [localError,setLocalError]=useState('');
- async function submit(e:FormEvent){e.preventDefault();setLocalError('');const ok=await onRun({type:'simulate',amount,currency,scenario,reference,key});if(ok)setRan(true);}
- return <section className="panel simulator-panel"><div className="panel-heading"><div><h2><span className="sim-icon"><Terminal size={16}/></span>Payment simulator</h2><p>Put your routing through its paces.</p></div><span className="pill indigo">TEST MODE</span></div><form onSubmit={submit}><label>Amount<div className="amount-input"><span>{currency==='EUR'?'€':'$'}</span><input aria-label="Payment amount" inputMode="decimal" value={amount} onChange={e=>{setAmount(e.target.value);setRan(false);}} required/><select aria-label="Payment currency" value={currency} onChange={e=>{setCurrency(e.target.value as Currency);setRan(false);}}>{currencies.map(c=><option key={c}>{c}</option>)}</select></div></label><label>Test scenario<select className="full-select" value={scenario} onChange={e=>{setScenario(e.target.value as Scenario);setRan(false);}}>{Object.entries(scenarioNames).map(([value,name])=><option key={value} value={value}>{name}</option>)}</select></label><div className="scenario-description">{scenario==='success'?<><CheckCircle2 size={14}/><span>Approved by the first available provider.</span></>:scenario==='primary_outage'?<><GitBranch size={14}/><span>First enabled provider times out. Try the next.</span></>:scenario==='hard_decline'?<><ShieldCheck size={14}/><span>Terminal decline. Never retry this payment.</span></>:<><AlertCircle size={14}/><span>All enabled routes time out. Payment fails.</span></>}</div><button type="button" className="advanced-toggle" onClick={()=>setAdvanced(!advanced)}><SlidersHorizontal size={13}/>Request details<ChevronDown size={13} className={advanced?'rotate':''}/><span>Idempotency & reference</span></button>{advanced&&<div className="advanced-fields"><label>Reference<input value={reference} maxLength={80} onChange={e=>{setReference(e.target.value);setRan(false);}}/></label><label>Idempotency key<div className="key-field"><input value={key} required minLength={8} maxLength={128} onChange={e=>{setKey(e.target.value);setRan(false);}}/><button type="button" className="icon-button" aria-label="Generate a new idempotency key" onClick={()=>{setKey(newKey());setRan(false);}}><RefreshCw size={13}/></button></div></label><small>Same request + same key returns the original payment. Changed request + same key is rejected.</small></div>}{localError&&<p className="form-error">{localError}</p>}<button className="button primary simulate-button" disabled={busy} type="submit">{busy?<LoaderCircle size={15} className="spin"/>:<Play size={14} fill="currentColor"/>}{busy?'Processing simulation…':ran?'Replay this payment':'Simulate payment'}<span>↵</span></button>{ran&&<button className="text-button new-payment" type="button" onClick={()=>{setKey(newKey());setRan(false);}}><Plus size={13}/>New payment key</button>}<p className="simulator-foot"><ShieldCheck size={12}/>Synthetic funds only. No card details needed.</p></form></section>;
+function Simulator({
+  busy,
+  onRun,
+}: {
+  busy: boolean;
+  onRun: (cmd: Record<string, unknown>) => Promise<boolean>;
+}) {
+  const [amount, setAmount] = useState('129.00');
+  const [currency, setCurrency] = useState<Currency>('AUD');
+  const [scenario, setScenario] = useState<Scenario>('success');
+  const [reference, setReference] = useState('Sandbox order');
+  const [key, setKey] = useState(newKey);
+  const [advanced, setAdvanced] = useState(false);
+  const [ran, setRan] = useState(false);
+  const [localError, setLocalError] = useState('');
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setLocalError('');
+    const ok = await onRun({ type: 'simulate', amount, currency, scenario, reference, key });
+    if (ok) setRan(true);
+  }
+  return (
+    <section className="panel simulator-panel">
+      <div className="panel-heading">
+        <div>
+          <h2>
+            <span className="sim-icon">
+              <Terminal size={16} />
+            </span>
+            Payment simulator
+          </h2>
+          <p>Put your routing through its paces.</p>
+        </div>
+        <span className="pill indigo">TEST MODE</span>
+      </div>
+      <form onSubmit={submit}>
+        <label>
+          Amount
+          <div className="amount-input">
+            <span>{currency === 'EUR' ? '€' : '$'}</span>
+            <input
+              aria-label="Payment amount"
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => {
+                setAmount(e.target.value);
+                setRan(false);
+              }}
+              required
+            />
+            <select
+              aria-label="Payment currency"
+              value={currency}
+              onChange={(e) => {
+                setCurrency(e.target.value as Currency);
+                setRan(false);
+              }}
+            >
+              {currencies.map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+        </label>
+        <label>
+          Test scenario
+          <select
+            className="full-select"
+            value={scenario}
+            onChange={(e) => {
+              setScenario(e.target.value as Scenario);
+              setRan(false);
+            }}
+          >
+            {Object.entries(scenarioNames).map(([value, name]) => (
+              <option key={value} value={value}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="scenario-description">
+          {scenario === 'success' ? (
+            <>
+              <CheckCircle2 size={14} />
+              <span>Approved by the first available provider.</span>
+            </>
+          ) : scenario === 'primary_outage' ? (
+            <>
+              <GitBranch size={14} />
+              <span>First enabled provider times out. Try the next.</span>
+            </>
+          ) : scenario === 'hard_decline' ? (
+            <>
+              <ShieldCheck size={14} />
+              <span>Terminal decline. Never retry this payment.</span>
+            </>
+          ) : (
+            <>
+              <AlertCircle size={14} />
+              <span>All enabled routes time out. Payment fails.</span>
+            </>
+          )}
+        </div>
+        <button type="button" className="advanced-toggle" onClick={() => setAdvanced(!advanced)}>
+          <SlidersHorizontal size={13} />
+          Request details
+          <ChevronDown size={13} className={advanced ? 'rotate' : ''} />
+          <span>Idempotency & reference</span>
+        </button>
+        {advanced && (
+          <div className="advanced-fields">
+            <label>
+              Reference
+              <input
+                value={reference}
+                maxLength={80}
+                onChange={(e) => {
+                  setReference(e.target.value);
+                  setRan(false);
+                }}
+              />
+            </label>
+            <label>
+              Idempotency key
+              <div className="key-field">
+                <input
+                  value={key}
+                  required
+                  minLength={8}
+                  maxLength={128}
+                  onChange={(e) => {
+                    setKey(e.target.value);
+                    setRan(false);
+                  }}
+                />
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label="Generate a new idempotency key"
+                  onClick={() => {
+                    setKey(newKey());
+                    setRan(false);
+                  }}
+                >
+                  <RefreshCw size={13} />
+                </button>
+              </div>
+            </label>
+            <small>
+              Same request + same key returns the original payment. Changed request + same key is
+              rejected.
+            </small>
+          </div>
+        )}
+        {localError && <p className="form-error">{localError}</p>}
+        <button className="button primary simulate-button" disabled={busy} type="submit">
+          {busy ? (
+            <LoaderCircle size={15} className="spin" />
+          ) : (
+            <Play size={14} fill="currentColor" />
+          )}
+          {busy ? 'Processing simulation…' : ran ? 'Replay this payment' : 'Simulate payment'}
+          <span>↵</span>
+        </button>
+        {ran && (
+          <button
+            className="text-button new-payment"
+            type="button"
+            onClick={() => {
+              setKey(newKey());
+              setRan(false);
+            }}
+          >
+            <Plus size={13} />
+            New payment key
+          </button>
+        )}
+        <p className="simulator-foot">
+          <ShieldCheck size={12} />
+          Synthetic funds only. No card details needed.
+        </p>
+      </form>
+    </section>
+  );
 }
-function TransactionTable({transactions,overview,onSelect,onViewAll,onExport}:{transactions:Payment[];overview?:boolean;onSelect:(p:Payment)=>void;onViewAll?:()=>void;onExport:()=>void}){
- const [search,setSearch]=useState('');const [filter,setFilter]=useState('all');const [page,setPage]=useState(0);const perPage=overview?5:10;
- const filtered=[...transactions].reverse().filter(p=>(filter==='all'||p.status===filter)&&[p.id,p.reference,p.key,p.providerId??''].join(' ').toLowerCase().includes(search.toLowerCase()));const {rows:visible,page:currentPage,start,end}=paginate(filtered,page,perPage);
- useEffect(()=>setPage(0),[search,filter]);
- useEffect(()=>{if(page!==currentPage)setPage(currentPage);},[page,currentPage]);
- return <section className="panel transactions-panel"><div className="panel-heading"><div className="table-title"><h2>{overview?'Recent transactions':'All transactions'}</h2><span className="count-badge">{transactions.length}</span></div><div className="table-heading-actions">{overview?<button className="button ghost" onClick={onViewAll}>View all transactions<ArrowRight size={14}/></button>:<button className="button secondary compact" onClick={onExport}><Download size={14}/>Export CSV</button>}</div></div><div className="table-toolbar"><div className="search-input"><Search size={15}/><input aria-label="Search transactions" placeholder="Search by ID, reference or provider…" value={search} onChange={e=>setSearch(e.target.value)}/></div><div className="filter-control"><SlidersHorizontal size={14}/><select aria-label="Filter transaction status" value={filter} onChange={e=>setFilter(e.target.value)}><option value="all">All statuses</option><option value="succeeded">Succeeded</option><option value="declined">Declined</option><option value="failed">Failed</option></select></div></div><div className="table-scroll"><table><thead><tr><th>Transaction</th><th>Amount</th><th>Status</th><th>Provider</th><th>Route</th><th>Latency</th><th>Synthetic time</th><th/></tr></thead><tbody>{visible.map(p=><tr key={p.id} onClick={()=>onSelect(p)}><td><button className="transaction-id" onClick={e=>{e.stopPropagation();onSelect(p);}}><span className="transaction-icon"><ArrowDownLeft size={14}/></span><span><code>{shortId(p.id)}</code><small>{p.reference}</small></span></button></td><td className="amount-cell">{formatMoney(p.amountMinor,p.currency)} <span>{p.currency}</span></td><td><Status status={p.status}/></td><td><span className="table-provider">{p.providerId?<><i className={providerClass[p.providerId]}/>{p.providerId[0].toUpperCase()+p.providerId.slice(1)}</>:<span className="muted">—</span>}</span></td><td>{p.attempts.length>1?<span className="route-fallback"><GitBranch size={12}/>{p.attempts.length} attempts</span>:<span className="direct-route">Direct</span>}</td><td className="mono muted">{p.latencyMs} <span>ms</span></td><td className="time-cell">{new Date(p.createdAt).toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'UTC'})} <span>UTC</span></td><td><ChevronRight size={14} className="muted"/></td></tr>)}</tbody></table></div>{!visible.length&&<div className="table-empty"><Search size={24}/><strong>No matching transactions</strong><p>Try another reference, ID or status.</p><button className="text-button" onClick={()=>{setSearch('');setFilter('all');}}>Clear filters</button></div>}<div className="table-footer"><span>Showing {start}–{end} of {filtered.length} transactions</span><span className="synthetic-label"><i/>Synthetic ledger</span>{!overview&&<div><button className="button ghost compact" disabled={currentPage===0} onClick={()=>setPage(currentPage-1)}>Previous</button><button className="button ghost compact" disabled={(currentPage+1)*perPage>=filtered.length} onClick={()=>setPage(currentPage+1)}>Next</button></div>}</div></section>;
+function TransactionTable({
+  transactions,
+  overview,
+  onSelect,
+  onViewAll,
+  onExport,
+}: {
+  transactions: Payment[];
+  overview?: boolean;
+  onSelect: (p: Payment) => void;
+  onViewAll?: () => void;
+  onExport: () => void;
+}) {
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [page, setPage] = useState(0);
+  const perPage = overview ? 5 : 10;
+  const filtered = [...transactions]
+    .reverse()
+    .filter(
+      (p) =>
+        (filter === 'all' || p.status === filter) &&
+        [p.id, p.reference, p.key, p.providerId ?? '']
+          .join(' ')
+          .toLowerCase()
+          .includes(search.toLowerCase()),
+    );
+  const { rows: visible, page: currentPage, start, end } = paginate(filtered, page, perPage);
+  useEffect(() => setPage(0), [search, filter]);
+  useEffect(() => {
+    if (page !== currentPage) setPage(currentPage);
+  }, [page, currentPage]);
+  return (
+    <section className="panel transactions-panel">
+      <div className="panel-heading">
+        <div className="table-title">
+          <h2>{overview ? 'Recent transactions' : 'All transactions'}</h2>
+          <span className="count-badge">{transactions.length}</span>
+        </div>
+        <div className="table-heading-actions">
+          {overview ? (
+            <button className="button ghost" onClick={onViewAll}>
+              View all transactions
+              <ArrowRight size={14} />
+            </button>
+          ) : (
+            <button className="button secondary compact" onClick={onExport}>
+              <Download size={14} />
+              Export CSV
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="table-toolbar">
+        <div className="search-input">
+          <Search size={15} />
+          <input
+            aria-label="Search transactions"
+            placeholder="Search by ID, reference or provider…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="filter-control">
+          <SlidersHorizontal size={14} />
+          <select
+            aria-label="Filter transaction status"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          >
+            <option value="all">All statuses</option>
+            <option value="succeeded">Succeeded</option>
+            <option value="declined">Declined</option>
+            <option value="failed">Failed</option>
+          </select>
+        </div>
+      </div>
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Transaction</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Provider</th>
+              <th>Route</th>
+              <th>Latency</th>
+              <th>Synthetic time</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {visible.map((p) => (
+              <tr key={p.id} onClick={() => onSelect(p)}>
+                <td>
+                  <button
+                    className="transaction-id"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelect(p);
+                    }}
+                  >
+                    <span className="transaction-icon">
+                      <ArrowDownLeft size={14} />
+                    </span>
+                    <span>
+                      <code>{shortId(p.id)}</code>
+                      <small>{p.reference}</small>
+                    </span>
+                  </button>
+                </td>
+                <td className="amount-cell">
+                  {formatMoney(p.amountMinor, p.currency)} <span>{p.currency}</span>
+                </td>
+                <td>
+                  <Status status={p.status} />
+                </td>
+                <td>
+                  <span className="table-provider">
+                    {p.providerId ? (
+                      <>
+                        <i className={providerClass[p.providerId]} />
+                        {p.providerId[0].toUpperCase() + p.providerId.slice(1)}
+                      </>
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
+                  </span>
+                </td>
+                <td>
+                  {p.attempts.length > 1 ? (
+                    <span className="route-fallback">
+                      <GitBranch size={12} />
+                      {p.attempts.length} attempts
+                    </span>
+                  ) : (
+                    <span className="direct-route">Direct</span>
+                  )}
+                </td>
+                <td className="mono muted">
+                  {p.latencyMs} <span>ms</span>
+                </td>
+                <td className="time-cell">
+                  {new Date(p.createdAt).toLocaleTimeString('en-AU', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                    timeZone: 'UTC',
+                  })}{' '}
+                  <span>UTC</span>
+                </td>
+                <td>
+                  <ChevronRight size={14} className="muted" />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {!visible.length && (
+        <div className="table-empty">
+          <Search size={24} />
+          <strong>No matching transactions</strong>
+          <p>Try another reference, ID or status.</p>
+          <button
+            className="text-button"
+            onClick={() => {
+              setSearch('');
+              setFilter('all');
+            }}
+          >
+            Clear filters
+          </button>
+        </div>
+      )}
+      <div className="table-footer">
+        <span>
+          Showing {start}–{end} of {filtered.length} transactions
+        </span>
+        <span className="synthetic-label">
+          <i />
+          Synthetic ledger
+        </span>
+        {!overview && (
+          <div>
+            <button
+              className="button ghost compact"
+              disabled={currentPage === 0}
+              onClick={() => setPage(currentPage - 1)}
+            >
+              Previous
+            </button>
+            <button
+              className="button ghost compact"
+              disabled={(currentPage + 1) * perPage >= filtered.length}
+              onClick={() => setPage(currentPage + 1)}
+            >
+              Next
+            </button>
+          </div>
+        )}
+      </div>
+    </section>
+  );
 }
-function Status({status}:{status:Payment['status']}){return <span className={`status-badge ${status}`}><i/>{status==='succeeded'?'Succeeded':status==='declined'?'Declined':'Failed'}</span>;}
-function ProviderCard({provider:p,index,busy,onChange,onMove}:{provider:Provider;index:number;busy:boolean;onChange:(enabled:boolean,outage:boolean)=>void;onMove:(direction:number)=>void}){
- return <article className="panel provider-card"><div className="provider-card-top"><span className={`provider-mark large ${providerClass[p.id]}`}>{p.name[0]}</span><div><h2>{p.name}</h2><p>{index===0?'Primary provider':`Fallback ${index}`}</p></div><span className={`pill ${p.enabled&&!p.outage?'green':p.outage?'amber':''}`}>{!p.enabled?'DISABLED':p.outage?'OUTAGE':'AVAILABLE'}</span></div><div className="provider-stats"><span>Simulated fee<strong>{(p.feeBps/100).toFixed(1)}% + {p.fixedFeeMinor}¢</strong></span><span>Base latency<strong>{p.latencyMs} ms</strong></span><div className="priority-arrows"><button className="icon-button" disabled={busy||index===0} onClick={()=>onMove(-1)} aria-label={`Move ${p.name} up`}><ArrowUp size={15}/></button><button className="icon-button" disabled={busy||index===2} onClick={()=>onMove(1)} aria-label={`Move ${p.name} down`}><ArrowDown size={15}/></button></div></div><div className="provider-controls"><label>Enabled<button role="switch" aria-checked={p.enabled} aria-label={`Enable ${p.name}`} className={`toggle ${p.enabled?'on':''}`} disabled={busy} onClick={()=>onChange(!p.enabled,p.outage)}><span/></button></label><label>Simulate outage<button role="switch" aria-checked={p.outage} aria-label={`Simulate ${p.name} outage`} className={`toggle ${p.outage?'outage':''}`} disabled={busy} onClick={()=>onChange(p.enabled,!p.outage)}><span/></button></label></div></article>;
+function Status({ status }: { status: Payment['status'] }) {
+  return (
+    <span className={`status-badge ${status}`}>
+      <i />
+      {status === 'succeeded' ? 'Succeeded' : status === 'declined' ? 'Declined' : 'Failed'}
+    </span>
+  );
 }
-function Rule({number,title,body}:{number:string;title:string;body:string}){return <div className="rule"><span>{number}</span><div><h3>{title}</h3><p>{body}</p></div></div>;}
-function ReconciliationView({state,busy,onCommand,toast}:{state:Workspace;busy:boolean;onCommand:(cmd:Record<string,unknown>)=>Promise<unknown>;toast:(s:string)=>void}){
- const [csv,setCsv]=useState('');const [fileError,setFileError]=useState('');const r=state.reconciliation;
- return <><div className="recon-summary"><div className="panel recon-summary-item"><span className="recon-icon green"><CheckCheck size={21}/></span><div><span>Matched payments</span><strong>{r?r.matched:'—'}</strong></div></div><div className="panel recon-summary-item"><span className="recon-icon amber"><AlertCircle size={21}/></span><div><span>Exceptions found</span><strong>{r?r.issues.length:'—'}</strong></div></div><div className="panel recon-summary-item"><span className="recon-icon indigo"><FileCheck2 size={21}/></span><div><span>Statement records</span><strong>{r?r.totalRows:'—'}</strong></div></div></div><div className="recon-grid"><section className="panel statement-panel"><div className="panel-heading"><div><h2>Settlement statement</h2><p>Compare against your successful sandbox payments.</p></div><span className="pill">CSV</span></div><div className="statement-body"><div className="demo-statement"><div className="file-symbol"><FileCheck2 size={24}/></div><h3>Start with a seeded statement</h3><p>A synthetic statement with one missing payment, one amount mismatch and one duplicate. Inspect what reconciliation catches.</p><button className="button primary" disabled={busy} onClick={async()=>{await onCommand({type:'reconcile',demo:true});}}>{busy?<LoaderCircle size={15} className="spin"/>:<Play size={14}/>}Run demo reconciliation</button><button className="text-button" onClick={()=>download('payroute-demo-statement.csv',demoStatement(state.transactions),'text/csv')}><Download size={12}/>Download demo CSV</button></div><div className="or-divider"><span/>OR USE YOUR OWN SANDBOX CSV<span/></div><label className="csv-label">Statement contents<textarea aria-label="Settlement statement CSV" spellCheck={false} value={csv} placeholder={'transaction_id,amount_minor,currency\npay_000001,12900,AUD'} onChange={e=>setCsv(e.target.value)} maxLength={30000}/></label><div className="csv-actions"><label className="button secondary upload-button"><Plus size={14}/>Import CSV<input type="file" accept=".csv,text/csv" onChange={async e=>{const file=e.target.files?.[0];if(!file)return;if(file.size>30000){setFileError('File exceeds 30 KB.');return;}setFileError('');setCsv(await file.text());}}/></label><button className="button secondary" disabled={busy||!csv.trim()} onClick={()=>void onCommand({type:'reconcile',csv})}>Reconcile statement<ArrowRight size={14}/></button></div>{fileError&&<p className="form-error">{fileError}</p>}<p className="statement-foot">Use integer minor units, e.g. <code>12900</code> = $129.00. Maximum 500 records / 30 KB. Synthetic data only.</p></div></section><section className="panel exceptions-panel"><div className="panel-heading"><div><h2>Reconciliation results</h2><p>{r?`${r.matched} matched · ${r.issues.length} exceptions`:'Run a statement to see the results.'}</p></div>{r&&<button className="icon-button" aria-label="Export reconciliation results" onClick={()=>{download('payroute-reconciliation.json',JSON.stringify({sandbox:true,...r},null,2));toast('Reconciliation JSON exported.');}}><Download size={16}/></button>}</div>{!r?<div className="recon-empty"><div className="recon-empty-art"><FileCheck2 size={38}/><span><Search size={18}/></span></div><h3>Every cent accounted for.</h3><p>Run reconciliation to find gaps between your payment ledger and settlement statement.</p><span className="pill">MISSING · MISMATCH · DUPLICATE</span></div>:<><div className="recon-complete"><CheckCircle2 size={15}/>Statement processed against {r.paymentCount} payments</div>{r.issues.length?<div className="issues-list">{r.issues.map((issue,i)=><div className="issue" key={i}><span className={`issue-icon ${issue.type==='missing'?'amber':'indigo'}`}>{issue.type==='duplicate'?<Copy size={16}/>:issue.type==='missing'?<Search size={16}/>:<AlertCircle size={16}/>}</span><div><strong>{issue.type.replaceAll('_',' ').replace(/^./,s=>s.toUpperCase())}</strong><code>{issue.transactionId}</code><p>{issue.detail}</p></div><span className="pill amber">REVIEW</span></div>)}</div>:<div className="recon-empty"><CheckCircle2 size={40} className="green"/><h3>Everything matches</h3><p>All successful payments have one matching settlement record.</p></div>}</>}</section></div></>;
+function ProviderCard({
+  provider: p,
+  index,
+  busy,
+  onChange,
+  onMove,
+}: {
+  provider: Provider;
+  index: number;
+  busy: boolean;
+  onChange: (enabled: boolean, outage: boolean) => void;
+  onMove: (direction: number) => void;
+}) {
+  return (
+    <article className="panel provider-card">
+      <div className="provider-card-top">
+        <span className={`provider-mark large ${providerClass[p.id]}`}>{p.name[0]}</span>
+        <div>
+          <h2>{p.name}</h2>
+          <p>{index === 0 ? 'Primary provider' : `Fallback ${index}`}</p>
+        </div>
+        <span className={`pill ${p.enabled && !p.outage ? 'green' : p.outage ? 'amber' : ''}`}>
+          {!p.enabled ? 'DISABLED' : p.outage ? 'OUTAGE' : 'AVAILABLE'}
+        </span>
+      </div>
+      <div className="provider-stats">
+        <span>
+          Simulated fee
+          <strong>
+            {(p.feeBps / 100).toFixed(1)}% + {p.fixedFeeMinor}¢
+          </strong>
+        </span>
+        <span>
+          Base latency<strong>{p.latencyMs} ms</strong>
+        </span>
+        <div className="priority-arrows">
+          <button
+            className="icon-button"
+            disabled={busy || index === 0}
+            onClick={() => onMove(-1)}
+            aria-label={`Move ${p.name} up`}
+          >
+            <ArrowUp size={15} />
+          </button>
+          <button
+            className="icon-button"
+            disabled={busy || index === 2}
+            onClick={() => onMove(1)}
+            aria-label={`Move ${p.name} down`}
+          >
+            <ArrowDown size={15} />
+          </button>
+        </div>
+      </div>
+      <div className="provider-controls">
+        <label>
+          Enabled
+          <button
+            role="switch"
+            aria-checked={p.enabled}
+            aria-label={`Enable ${p.name}`}
+            className={`toggle ${p.enabled ? 'on' : ''}`}
+            disabled={busy}
+            onClick={() => onChange(!p.enabled, p.outage)}
+          >
+            <span />
+          </button>
+        </label>
+        <label>
+          Simulate outage
+          <button
+            role="switch"
+            aria-checked={p.outage}
+            aria-label={`Simulate ${p.name} outage`}
+            className={`toggle ${p.outage ? 'outage' : ''}`}
+            disabled={busy}
+            onClick={() => onChange(p.enabled, !p.outage)}
+          >
+            <span />
+          </button>
+        </label>
+      </div>
+    </article>
+  );
 }
-function PaymentDetail({payment:p,onClose,onCopy}:{payment:Payment;onClose:()=>void;onCopy:(text:string)=>void}){
- const closeRef=useRef<HTMLButtonElement>(null);
- useEffect(()=>{closeRef.current?.focus();const handler=(e:KeyboardEvent)=>{if(e.key==='Escape')onClose();};document.addEventListener('keydown',handler);const overflow=document.body.style.overflow;document.body.style.overflow='hidden';return()=>{document.removeEventListener('keydown',handler);document.body.style.overflow=overflow;};},[onClose]);
- return <div className="detail-backdrop" onClick={onClose}><section className="detail-drawer" role="dialog" aria-modal="true" aria-labelledby="payment-title" onClick={e=>e.stopPropagation()}><div className="detail-top"><span>PAYMENT DETAILS</span><button className="icon-button" aria-label="Close payment details" ref={closeRef} onClick={onClose}><X size={20}/></button></div><div className="detail-header"><div className="detail-payment-icon"><CreditCard size={25}/></div><h2 id="payment-title">{formatMoney(p.amountMinor,p.currency)}<span>{p.currency}</span></h2><div><code>{p.id}</code><button className="icon-button" aria-label="Copy payment ID" onClick={()=>onCopy(p.id)}><Copy size={13}/></button><Status status={p.status}/></div></div><div className="detail-facts"><div><span>Reference</span><strong>{p.reference||'—'}</strong></div><div><span>Scenario</span><strong>{scenarioNames[p.scenario]}</strong></div><div><span>Simulated fee</span><strong>{formatMoney(p.feeMinor,p.currency)} {p.currency}</strong></div><div><span>Total simulated latency</span><strong>{p.latencyMs} ms</strong></div><div><span>Synthetic timestamp</span><strong>{p.createdAt.replace('T',' ').replace('.000Z',' UTC')}</strong></div></div><div className="detail-section"><h3><GitBranch size={16}/>Routing timeline<span>{p.attempts.length} attempts</span></h3>{p.attempts.length===0?<div className="info-card"><AlertCircle size={18}/><p>No providers were enabled. No attempts were made.</p></div>:<div className="timeline">{p.attempts.map((a,i)=><div className={`timeline-step ${a.outcome}`} key={i}><span className="timeline-dot">{a.outcome==='approved'?<Check size={13}/>:a.outcome==='declined'?<X size={12}/>:<Clock3 size={12}/>}</span><div><div className="timeline-heading"><strong>{a.providerId[0].toUpperCase()+a.providerId.slice(1)}</strong><span>{a.latencyMs} ms</span></div><span className={`timeline-outcome ${a.outcome==='approved'?'green':'amber'}`}>{a.outcome==='approved'?'Authorization approved':a.outcome==='declined'?'Hard decline · terminal':'Provider unavailable'}</span><p>{a.reason}</p></div></div>)}</div>}</div><div className="detail-section"><h3><ShieldCheck size={16}/>Idempotency protection</h3><div className="idempotency-box"><code>{p.key}</code><button className="icon-button" aria-label="Copy idempotency key" onClick={()=>onCopy(p.key)}><Copy size={14}/></button></div><p className="detail-hint">This key is bound to the original amount, currency, reference and scenario. Replays create no new attempts.</p></div><div className="detail-section"><button className="button secondary full-width" onClick={()=>download(`${p.id}.json`,JSON.stringify({sandbox:true,...p},null,2))}><Download size={15}/>Export payment JSON</button></div><div className="drawer-sandbox"><ShieldCheck size={14}/>Sandbox payment. No funds were moved.</div></section></div>;
+function Rule({ number, title, body }: { number: string; title: string; body: string }) {
+  return (
+    <div className="rule">
+      <span>{number}</span>
+      <div>
+        <h3>{title}</h3>
+        <p>{body}</p>
+      </div>
+    </div>
+  );
 }
-function Guide(){return <div className="guide-layout"><section className="panel guide-hero"><span className="guide-icon"><Code2 size={27}/></span><span className="pill indigo">BUILT TO BE EXPLORED</span><h2>Payment systems,<br/>without the real money.</h2><p>PayRoute is a working engineering sandbox for the decisions that sit between a payment request and its final settlement.</p><div><a className="button primary" href="https://github.com/tanveerchana" target="_blank" rel="noreferrer">Explore GitHub<ArrowUpRight size={15}/></a><a className="button secondary" href="https://singhtanveer.com" target="_blank" rel="noreferrer">Meet the builder<ArrowUpRight size={15}/></a></div></section><section className="panel guide-panel"><div className="panel-heading"><h2>The request lifecycle</h2><span className="pill">ENGINEERING NOTES</span></div><Rule number="01" title="Validate and normalize" body="Decimal strings become exact integer minor units. Supported currencies: AUD, USD, CAD and EUR. Excess precision and invalid amounts are rejected."/><Rule number="02" title="Resolve idempotency before routing" body="A matching key and payload return the saved result. A conflicting payload is rejected. PostgreSQL compare-and-swap serializes concurrent workspace mutations."/><Rule number="03" title="Simulate deterministic provider attempts" body="No provider APIs are called. Latencies, fees and responses are calculated from the synthetic configuration. Time advances on a fixed demo clock."/><Rule number="04" title="Reconcile against a statement" body="CSV rows are compared to successful payments. Missing, duplicate, unexpected, amount and currency discrepancies are reported separately."/></section><section className="panel guide-api"><div className="panel-heading"><div><h2>Workspace command</h2><p>A local sandbox token isolates each browser workspace.</p></div><Terminal size={18}/></div><pre><span className="code-comment">// POST /api/workspace · synthetic example</span>{'\n'}<span className="code-purple">{'{'}</span>{'\n  "command": {\n    "type": "simulate",\n    "amount": "129.00",\n    "currency": "AUD",\n    "scenario": "primary_outage",\n    "reference": "Sandbox order",\n    "key": "example_idempotency_01"\n  }\n'}<span className="code-purple">{'}'}</span></pre><div className="code-foot"><ShieldCheck size={14}/>Bearer token required · 200 payments per workspace · No live mode</div></section><section className="panel guide-boundaries"><h2>Honest by construction.</h2><p>Metrics come from the current synthetic ledger. Volume is scoped to your selected currency. Fees apply only to successful payments, using each provider’s disclosed synthetic rate.</p><p>The workspace is isolated by a random 256-bit browser token. This portfolio demo has no user accounts, live card processing, real settlement or production payment guarantees.</p><span className="pill green"><Check size={12}/>SANDBOX ONLY</span></section></div>;}
+function ReconciliationView({
+  state,
+  busy,
+  onCommand,
+  toast,
+}: {
+  state: Workspace;
+  busy: boolean;
+  onCommand: (cmd: Record<string, unknown>) => Promise<unknown>;
+  toast: (s: string) => void;
+}) {
+  const [csv, setCsv] = useState('');
+  const [fileError, setFileError] = useState('');
+  const r = state.reconciliation;
+  return (
+    <>
+      <div className="recon-summary">
+        <div className="panel recon-summary-item">
+          <span className="recon-icon green">
+            <CheckCheck size={21} />
+          </span>
+          <div>
+            <span>Matched payments</span>
+            <strong>{r ? r.matched : '—'}</strong>
+          </div>
+        </div>
+        <div className="panel recon-summary-item">
+          <span className="recon-icon amber">
+            <AlertCircle size={21} />
+          </span>
+          <div>
+            <span>Exceptions found</span>
+            <strong>{r ? r.issues.length : '—'}</strong>
+          </div>
+        </div>
+        <div className="panel recon-summary-item">
+          <span className="recon-icon indigo">
+            <FileCheck2 size={21} />
+          </span>
+          <div>
+            <span>Statement records</span>
+            <strong>{r ? r.totalRows : '—'}</strong>
+          </div>
+        </div>
+      </div>
+      <div className="recon-grid">
+        <section className="panel statement-panel">
+          <div className="panel-heading">
+            <div>
+              <h2>Settlement statement</h2>
+              <p>Compare against your successful sandbox payments.</p>
+            </div>
+            <span className="pill">CSV</span>
+          </div>
+          <div className="statement-body">
+            <div className="demo-statement">
+              <div className="file-symbol">
+                <FileCheck2 size={24} />
+              </div>
+              <h3>Start with a seeded statement</h3>
+              <p>
+                A synthetic statement with one missing payment, one amount mismatch and one
+                duplicate. Inspect what reconciliation catches.
+              </p>
+              <button
+                className="button primary"
+                disabled={busy}
+                onClick={async () => {
+                  await onCommand({ type: 'reconcile', demo: true });
+                }}
+              >
+                {busy ? <LoaderCircle size={15} className="spin" /> : <Play size={14} />}Run demo
+                reconciliation
+              </button>
+              <button
+                className="text-button"
+                onClick={() =>
+                  download(
+                    'payroute-demo-statement.csv',
+                    demoStatement(state.transactions),
+                    'text/csv',
+                  )
+                }
+              >
+                <Download size={12} />
+                Download demo CSV
+              </button>
+            </div>
+            <div className="or-divider">
+              <span />
+              OR USE YOUR OWN SANDBOX CSV
+              <span />
+            </div>
+            <label className="csv-label">
+              Statement contents
+              <textarea
+                aria-label="Settlement statement CSV"
+                spellCheck={false}
+                value={csv}
+                placeholder={'transaction_id,amount_minor,currency\npay_000001,12900,AUD'}
+                onChange={(e) => setCsv(e.target.value)}
+                maxLength={30000}
+              />
+            </label>
+            <div className="csv-actions">
+              <label className="button secondary upload-button">
+                <Plus size={14} />
+                Import CSV
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 30000) {
+                      setFileError('File exceeds 30 KB.');
+                      return;
+                    }
+                    setFileError('');
+                    setCsv(await file.text());
+                  }}
+                />
+              </label>
+              <button
+                className="button secondary"
+                disabled={busy || !csv.trim()}
+                onClick={() => void onCommand({ type: 'reconcile', csv })}
+              >
+                Reconcile statement
+                <ArrowRight size={14} />
+              </button>
+            </div>
+            {fileError && <p className="form-error">{fileError}</p>}
+            <p className="statement-foot">
+              Use integer minor units, e.g. <code>12900</code> = $129.00. Maximum 500 records / 30
+              KB. Synthetic data only.
+            </p>
+          </div>
+        </section>
+        <section className="panel exceptions-panel">
+          <div className="panel-heading">
+            <div>
+              <h2>Reconciliation results</h2>
+              <p>
+                {r
+                  ? `${r.matched} matched · ${r.issues.length} exceptions`
+                  : 'Run a statement to see the results.'}
+              </p>
+            </div>
+            {r && (
+              <button
+                className="icon-button"
+                aria-label="Export reconciliation results"
+                onClick={() => {
+                  download(
+                    'payroute-reconciliation.json',
+                    JSON.stringify({ sandbox: true, ...r }, null, 2),
+                  );
+                  toast('Reconciliation JSON exported.');
+                }}
+              >
+                <Download size={16} />
+              </button>
+            )}
+          </div>
+          {!r ? (
+            <div className="recon-empty">
+              <div className="recon-empty-art">
+                <FileCheck2 size={38} />
+                <span>
+                  <Search size={18} />
+                </span>
+              </div>
+              <h3>Every cent accounted for.</h3>
+              <p>
+                Run reconciliation to find gaps between your payment ledger and settlement
+                statement.
+              </p>
+              <span className="pill">MISSING · MISMATCH · DUPLICATE</span>
+            </div>
+          ) : (
+            <>
+              <div className="recon-complete">
+                <CheckCircle2 size={15} />
+                Statement processed against {r.paymentCount} payments
+              </div>
+              {r.issues.length ? (
+                <div className="issues-list">
+                  {r.issues.map((issue, i) => (
+                    <div className="issue" key={i}>
+                      <span
+                        className={`issue-icon ${issue.type === 'missing' ? 'amber' : 'indigo'}`}
+                      >
+                        {issue.type === 'duplicate' ? (
+                          <Copy size={16} />
+                        ) : issue.type === 'missing' ? (
+                          <Search size={16} />
+                        ) : (
+                          <AlertCircle size={16} />
+                        )}
+                      </span>
+                      <div>
+                        <strong>
+                          {issue.type.replaceAll('_', ' ').replace(/^./, (s) => s.toUpperCase())}
+                        </strong>
+                        <code>{issue.transactionId}</code>
+                        <p>{issue.detail}</p>
+                      </div>
+                      <span className="pill amber">REVIEW</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="recon-empty">
+                  <CheckCircle2 size={40} className="green" />
+                  <h3>Everything matches</h3>
+                  <p>All successful payments have one matching settlement record.</p>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      </div>
+    </>
+  );
+}
+function PaymentDetail({
+  payment: p,
+  onClose,
+  onCopy,
+}: {
+  payment: Payment;
+  onClose: () => void;
+  onCopy: (text: string) => void;
+}) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    closeRef.current?.focus();
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handler);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', handler);
+      document.body.style.overflow = overflow;
+    };
+  }, [onClose]);
+  return (
+    <div className="detail-backdrop" onClick={onClose}>
+      <section
+        className="detail-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="payment-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="detail-top">
+          <span>PAYMENT DETAILS</span>
+          <button
+            className="icon-button"
+            aria-label="Close payment details"
+            ref={closeRef}
+            onClick={onClose}
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <div className="detail-header">
+          <div className="detail-payment-icon">
+            <CreditCard size={25} />
+          </div>
+          <h2 id="payment-title">
+            {formatMoney(p.amountMinor, p.currency)}
+            <span>{p.currency}</span>
+          </h2>
+          <div>
+            <code>{p.id}</code>
+            <button
+              className="icon-button"
+              aria-label="Copy payment ID"
+              onClick={() => onCopy(p.id)}
+            >
+              <Copy size={13} />
+            </button>
+            <Status status={p.status} />
+          </div>
+        </div>
+        <div className="detail-facts">
+          <div>
+            <span>Reference</span>
+            <strong>{p.reference || '—'}</strong>
+          </div>
+          <div>
+            <span>Scenario</span>
+            <strong>{scenarioNames[p.scenario]}</strong>
+          </div>
+          <div>
+            <span>Simulated fee</span>
+            <strong>
+              {formatMoney(p.feeMinor, p.currency)} {p.currency}
+            </strong>
+          </div>
+          <div>
+            <span>Total simulated latency</span>
+            <strong>{p.latencyMs} ms</strong>
+          </div>
+          <div>
+            <span>Synthetic timestamp</span>
+            <strong>{p.createdAt.replace('T', ' ').replace('.000Z', ' UTC')}</strong>
+          </div>
+        </div>
+        <div className="detail-section">
+          <h3>
+            <GitBranch size={16} />
+            Routing timeline<span>{p.attempts.length} attempts</span>
+          </h3>
+          {p.attempts.length === 0 ? (
+            <div className="info-card">
+              <AlertCircle size={18} />
+              <p>No providers were enabled. No attempts were made.</p>
+            </div>
+          ) : (
+            <div className="timeline">
+              {p.attempts.map((a, i) => (
+                <div className={`timeline-step ${a.outcome}`} key={i}>
+                  <span className="timeline-dot">
+                    {a.outcome === 'approved' ? (
+                      <Check size={13} />
+                    ) : a.outcome === 'declined' ? (
+                      <X size={12} />
+                    ) : (
+                      <Clock3 size={12} />
+                    )}
+                  </span>
+                  <div>
+                    <div className="timeline-heading">
+                      <strong>{a.providerId[0].toUpperCase() + a.providerId.slice(1)}</strong>
+                      <span>{a.latencyMs} ms</span>
+                    </div>
+                    <span
+                      className={`timeline-outcome ${a.outcome === 'approved' ? 'green' : 'amber'}`}
+                    >
+                      {a.outcome === 'approved'
+                        ? 'Authorization approved'
+                        : a.outcome === 'declined'
+                          ? 'Hard decline · terminal'
+                          : 'Provider unavailable'}
+                    </span>
+                    <p>{a.reason}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="detail-section">
+          <h3>
+            <ShieldCheck size={16} />
+            Idempotency protection
+          </h3>
+          <div className="idempotency-box">
+            <code>{p.key}</code>
+            <button
+              className="icon-button"
+              aria-label="Copy idempotency key"
+              onClick={() => onCopy(p.key)}
+            >
+              <Copy size={14} />
+            </button>
+          </div>
+          <p className="detail-hint">
+            This key is bound to the original amount, currency, reference and scenario. Replays
+            create no new attempts.
+          </p>
+        </div>
+        <div className="detail-section">
+          <button
+            className="button secondary full-width"
+            onClick={() =>
+              download(`${p.id}.json`, JSON.stringify({ sandbox: true, ...p }, null, 2))
+            }
+          >
+            <Download size={15} />
+            Export payment JSON
+          </button>
+        </div>
+        <div className="drawer-sandbox">
+          <ShieldCheck size={14} />
+          Sandbox payment. No funds were moved.
+        </div>
+      </section>
+    </div>
+  );
+}
+function Guide() {
+  return (
+    <div className="guide-layout">
+      <section className="panel guide-hero">
+        <span className="guide-icon">
+          <Code2 size={27} />
+        </span>
+        <span className="pill indigo">BUILT TO BE EXPLORED</span>
+        <h2>
+          Payment systems,
+          <br />
+          without the real money.
+        </h2>
+        <p>
+          PayRoute is a working engineering sandbox for the decisions that sit between a payment
+          request and its final settlement.
+        </p>
+        <div>
+          <a
+            className="button primary"
+            href="https://github.com/tanveerchana"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Explore GitHub
+            <ArrowUpRight size={15} />
+          </a>
+          <a
+            className="button secondary"
+            href="https://singhtanveer.com"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Meet the builder
+            <ArrowUpRight size={15} />
+          </a>
+        </div>
+      </section>
+      <section className="panel guide-panel">
+        <div className="panel-heading">
+          <h2>The request lifecycle</h2>
+          <span className="pill">ENGINEERING NOTES</span>
+        </div>
+        <Rule
+          number="01"
+          title="Validate and normalize"
+          body="Decimal strings become exact integer minor units. Supported currencies: AUD, USD, CAD and EUR. Excess precision and invalid amounts are rejected."
+        />
+        <Rule
+          number="02"
+          title="Resolve idempotency before routing"
+          body="A matching key and payload return the saved result. A conflicting payload is rejected. PostgreSQL compare-and-swap serializes concurrent workspace mutations."
+        />
+        <Rule
+          number="03"
+          title="Simulate deterministic provider attempts"
+          body="No provider APIs are called. Latencies, fees and responses are calculated from the synthetic configuration. Time advances on a fixed demo clock."
+        />
+        <Rule
+          number="04"
+          title="Reconcile against a statement"
+          body="CSV rows are compared to successful payments. Missing, duplicate, unexpected, amount and currency discrepancies are reported separately."
+        />
+      </section>
+      <section className="panel guide-api">
+        <div className="panel-heading">
+          <div>
+            <h2>Workspace command</h2>
+            <p>A local sandbox token isolates each browser workspace.</p>
+          </div>
+          <Terminal size={18} />
+        </div>
+        <pre>
+          <span className="code-comment">// POST /api/workspace · synthetic example</span>
+          {'\n'}
+          <span className="code-purple">{'{'}</span>
+          {
+            '\n  "command": {\n    "type": "simulate",\n    "amount": "129.00",\n    "currency": "AUD",\n    "scenario": "primary_outage",\n    "reference": "Sandbox order",\n    "key": "example_idempotency_01"\n  }\n'
+          }
+          <span className="code-purple">{'}'}</span>
+        </pre>
+        <div className="code-foot">
+          <ShieldCheck size={14} />
+          Bearer token required · 200 payments per workspace · No live mode
+        </div>
+      </section>
+      <section className="panel guide-boundaries">
+        <h2>Honest by construction.</h2>
+        <p>
+          Metrics come from the current synthetic ledger. Volume is scoped to your selected
+          currency. Fees apply only to successful payments, using each provider’s disclosed
+          synthetic rate.
+        </p>
+        <p>
+          The workspace is isolated by a random 256-bit browser token. This portfolio demo has no
+          user accounts, live card processing, real settlement or production payment guarantees.
+        </p>
+        <span className="pill green">
+          <Check size={12} />
+          SANDBOX ONLY
+        </span>
+      </section>
+    </div>
+  );
+}
 export default App;

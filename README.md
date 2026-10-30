@@ -1,6 +1,10 @@
 # PayRoute Sandbox
 
+[**Open live demo**](https://payroute-sandbox.vercel.app) · [Verification record](docs/verification.md) · [Design decisions](docs/design.md)
+
 A payment orchestration lab by [Tanveer Singh](https://singhtanveer.com). Route synthetic payments through three simulated providers, trigger outages, inspect retries and reconcile a settlement statement. Every payment is sandbox data. No real providers, card details, funds or payment networks are involved.
+
+![Live PayRoute Sandbox workspace](docs/preview.jpg)
 
 ## What works
 
