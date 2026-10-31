@@ -4,18 +4,24 @@ Verified on 31 October 2026. This is an engineering portfolio demo using synthet
 
 ## Local quality checks
 
-- `npm test`: **33 tests pass**, including shared storage/HTTP boundary cases.
+- `npm test`: **60 tests pass**, including shared storage/HTTP boundary cases.
 - `npm run typecheck`: passes.
 - `npm run format:check`: passes.
 - `npm run build`: passes.
 
 The checked-in GitHub Actions workflow runs installation, tests, types, formatting and a production build on pushes and pull requests. It does not deploy or receive production credentials.
 
-## Hosted workflow check
+## Earlier hosted demo workflow check
 
 In the hosted browser, a primary-provider outage routed a synthetic AUD120.50 payment from Atlas to Pulse. Replaying the same payment kept the ledger at 37 rows and reused its original attempts. Demo reconciliation returned 31 matches and three exceptions: missing, duplicate and amount mismatch. No funds moved.
 
 Live demo: https://payroute-sandbox.vercel.app
+
+## Account security verification
+
+The account migration was applied to the hosted Supabase project on 31 October 2026. Rollback-only SQL assertions passed for cross-workspace/app isolation, viewer secret redaction and write denial, independent app-bound backend credentials, staff job transitions and financial isolation, owner-only membership management, verified-email invitation matching, membership removal, stale revisions, and scoped external ingestion. Two synthetic auth fixtures and all workspace fixtures were created inside the test transaction and rolled back; a follow-up query confirmed zero fixture rows remained.
+
+The application requires both a verified provider session and current database membership. Account and demo transport tests prove that account requests cannot fall back to a demo token. Password exchange, refresh, cookie flags, same-origin checks, and error paths have injected-provider unit coverage. These tests do not establish real email delivery or a complete provider signup/confirmation/login browser run.
 
 ## Database boundary
 

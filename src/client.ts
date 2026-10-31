@@ -1,4 +1,5 @@
 import type { Workspace, Payment } from './domain';
+import { currentAccess, withWorkspaceAccess, handleAccessResponse } from './access/access';
 export type Envelope = {
   state: Workspace;
   revision: number;
@@ -25,14 +26,18 @@ export function workspaceToken(
   return token;
 }
 export async function requestWorkspace(command?: Record<string, unknown>): Promise<Envelope> {
-  const response = await fetch('/api/workspace', {
-    method: command ? 'POST' : 'GET',
-    headers: {
-      Authorization: `Bearer ${workspaceToken()}`,
-      ...(command ? { 'Content-Type': 'application/json' } : {}),
-    },
-    ...(command ? { body: JSON.stringify({ command }) } : {}),
-  });
+  const headers = new Headers(command ? { 'Content-Type': 'application/json' } : undefined);
+  if (currentAccess().mode === 'demo') headers.set('Authorization', `Bearer ${workspaceToken()}`);
+  const response = handleAccessResponse(
+    await fetch(
+      '/api/workspace',
+      withWorkspaceAccess({
+        method: command ? 'POST' : 'GET',
+        headers,
+        ...(command ? { body: JSON.stringify({ command }) } : {}),
+      }),
+    ),
+  );
   let data: any;
   try {
     data = await response.json();

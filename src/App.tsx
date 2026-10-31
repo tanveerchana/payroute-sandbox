@@ -42,6 +42,7 @@ import { currencies, formatMoney, exportCsv, demoStatement } from './domain';
 import type { Currency, Payment, Provider, Scenario, Workspace } from './domain';
 import { requestWorkspace, download } from './client';
 import { paginate } from './pagination';
+import { can } from './access/access';
 
 type Page = 'Overview' | 'Transactions' | 'Routing' | 'Reconciliation' | 'Developer guide';
 const pages: { name: Page; icon: typeof Route }[] = [
@@ -95,6 +96,18 @@ function App() {
     return () => clearTimeout(noticeTimer.current);
   }, []);
   async function command(cmd: Record<string, unknown>) {
+    const action = cmd.type;
+    if (
+      (action === 'simulate' ||
+        action === 'reconcile' ||
+        action === 'provider' ||
+        action === 'route' ||
+        action === 'reset') &&
+      !can(action)
+    ) {
+      setError('Your workspace role does not allow this action.');
+      return null;
+    }
     setBusy(true);
     setError('');
     try {
@@ -139,11 +152,10 @@ function App() {
           PayRoute<span className="brand-dot">.</span>
         </a>
         <div className="workspace-switch">
-          <span className="workspace-icon">TS</span>
+          <CreditCard size={20} />
           <span>
-            Tanveer’s workspace<small>Personal sandbox</small>
+            Payment operations<small>Synthetic portfolio workspace</small>
           </span>
-          <ChevronDown size={14} />
         </div>
         <div className="nav-label">WORKSPACE</div>
         <nav>
@@ -170,7 +182,7 @@ function App() {
         </button>
         <a
           className="nav-item"
-          href="https://github.com/tanveerchana"
+          href="https://github.com/tanveerchana/payroute-sandbox"
           target="_blank"
           rel="noreferrer"
         >
@@ -180,15 +192,9 @@ function App() {
         </a>
         <div className="sidebar-bottom">
           <div className="sandbox-note">
-            <div className="mini-shield">
-              <ShieldCheck size={19} />
-            </div>
-            <strong>A safe place to experiment</strong>
-            <p>Synthetic payments. Real engineering. No money moves.</p>
-            <span>
-              <i />
-              Sandbox environment
-            </span>
+            <ShieldCheck size={18} />
+            <strong>Sandbox only</strong>
+            <p>Synthetic payments and simulated providers. No real funds move.</p>
           </div>
           <a className="profile" href="https://singhtanveer.com" target="_blank" rel="noreferrer">
             <span className="avatar">TS</span>
@@ -219,32 +225,23 @@ function App() {
               <span />
               SANDBOX
             </span>
-            <span className="topbar-divider" />
-            <a
-              href="https://singhtanveer.com"
-              target="_blank"
-              rel="noreferrer"
-              className="avatar small"
-            >
-              TS
-            </a>
           </div>
         </header>
         <main>
           <div className="page-heading">
             <div>
-              <div className="eyebrow">PAYMENT ORCHESTRATION LAB</div>
-              <h1>{page === 'Overview' ? 'Every payment. The right route.' : page}</h1>
+              <div className="eyebrow">SYNTHETIC PAYMENT WORKSPACE</div>
+              <h1>{page === 'Overview' ? 'Payments overview' : page}</h1>
               <p>
                 {page === 'Overview'
-                  ? 'A clear view of your payment flow, from the first attempt to settlement.'
+                  ? 'Simulate payments, review provider attempts and reconcile statements.'
                   : page === 'Transactions'
-                    ? 'Every synthetic payment, every decision, all in one place.'
+                    ? 'Review synthetic payments, statuses and routing attempts.'
                     : page === 'Routing'
-                      ? 'Control provider priority and test how your routing responds.'
+                      ? 'Set the provider priority and availability used for new payments.'
                       : page === 'Reconciliation'
-                        ? 'Close the loop between successful payments and simulated settlements.'
-                        : 'Explore the engineering behind this sandbox.'}
+                        ? 'Compare successful payments with a synthetic settlement statement.'
+                        : 'Validation, routing rules and workspace access.'}
               </p>
             </div>
             <div className="heading-actions">
@@ -390,11 +387,6 @@ function App() {
               {page === 'Overview' && (
                 <>
                   <div className="overview-grid">
-                    <Topology
-                      providers={state.providers}
-                      latest={all.at(-1)!}
-                      onConfigure={() => navigate('Routing')}
-                    />
                     <Simulator
                       busy={busy}
                       onRun={async (cmd) => {
@@ -409,6 +401,11 @@ function App() {
                         }
                         return !!data;
                       }}
+                    />
+                    <Topology
+                      providers={state.providers}
+                      latest={all.at(-1)!}
+                      onConfigure={() => navigate('Routing')}
                     />
                   </div>
                   <TransactionTable
@@ -431,6 +428,11 @@ function App() {
               )}
               {page === 'Routing' && (
                 <>
+                  {!can('provider') && (
+                    <p className="permission-note">
+                      Only workspace owners can change provider settings and routing priority.
+                    </p>
+                  )}
                   <div className="routing-intro">
                     <div>
                       <GitBranch size={18} />
@@ -485,7 +487,7 @@ function App() {
                     />
                     <div className="panel rules-panel">
                       <div className="panel-heading">
-                        <h2>Built for predictable behavior</h2>
+                        <h2>Routing rules</h2>
                         <span className="pill">ROUTING RULES</span>
                       </div>
                       <Rule
@@ -516,14 +518,16 @@ function App() {
                   <ShieldCheck size={13} />
                   Sandbox only · Synthetic data · No real funds or payment networks
                 </span>
-                <button
-                  className="text-button"
-                  onClick={() => setConfirmReset(true)}
-                  disabled={busy}
-                >
-                  Reset sandbox
-                  <RefreshCw size={12} />
-                </button>
+                {can('reset') && (
+                  <button
+                    className="text-button"
+                    onClick={() => setConfirmReset(true)}
+                    disabled={busy}
+                  >
+                    Reset sandbox
+                    <RefreshCw size={12} />
+                  </button>
+                )}
                 <span className="footer-author">
                   Built by{' '}
                   <a href="https://singhtanveer.com" target="_blank" rel="noreferrer">
@@ -586,7 +590,7 @@ function App() {
               </button>
               <button
                 className="button primary"
-                disabled={busy}
+                disabled={busy || !can('reset')}
                 onClick={async () => {
                   const data = await command({ type: 'reset' });
                   if (data) {
@@ -635,128 +639,56 @@ function Topology({
   latest: Payment;
   onConfigure?: () => void;
 }) {
-  const enabled = providers.filter((p) => p.enabled && !p.outage).length;
+  const available = providers.filter((p) => p.enabled && !p.outage).length;
   return (
     <section className="panel topology-panel">
       <div className="panel-heading">
         <div>
-          <h2>
-            Routing topology
-            <span className="live-dot" />
-          </h2>
-          <p>One integration. Multiple paths to success.</p>
+          <h2>Routing order</h2>
+          <p>Enabled providers are attempted in priority order.</p>
         </div>
         {onConfigure ? (
-          <button className="button ghost" onClick={onConfigure}>
-            <Settings2 size={14} />
-            Configure
-            <ChevronRight size={13} />
+          <button className="button secondary" onClick={onConfigure}>
+            <Settings2 size={16} />
+            View settings
           </button>
         ) : (
-          <span className="pill">{enabled}/3 AVAILABLE</span>
+          <span className="pill">{available} of 3 available</span>
         )}
       </div>
-      <div className="topology-canvas">
-        <div className="canvas-caption">
-          <span className="tiny-dot" />
-          PRIORITY ROUTING <span>v1.0</span>
-        </div>
-        <svg
-          className="topology-lines"
-          viewBox="0 0 720 242"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <defs>
-            <linearGradient id="flow" x1="0" x2="1">
-              <stop stopColor="#6863e4" />
-              <stop offset="1" stopColor="#a89eff" />
-            </linearGradient>
-          </defs>
-          <path className="flow-path" d="M125 118 H265" />
-          <path className="flow-path" d="M390 118 H433 Q450 118 450 101 V55 Q450 40 470 40 H520" />
-          <path className="flow-path secondary-path" d="M390 118 H520" />
-          <path
-            className="flow-path secondary-path"
-            d="M390 118 H433 Q450 118 450 135 V183 Q450 198 470 198 H520"
-          />
-          <circle className="flow-orb" cx="205" cy="118" r="3" />
-          <circle cx="488" cy="40" r="3" fill="#a399ff" />
-        </svg>
-        <div className="graph-node incoming-node">
-          <div className="graph-node-icon">
-            <CreditCard size={20} />
-          </div>
-          <strong>Payment</strong>
-          <span>Incoming request</span>
-        </div>
-        <div className="edge-label">idempotent</div>
-        <div className="graph-node engine-node">
-          <div className="engine-icon">
-            <Route size={24} />
-          </div>
-          <strong>PayRoute</strong>
-          <span>Routing engine</span>
-          <i className="node-port left" />
-          <i className="node-port right" />
-        </div>
-        <div className="provider-nodes">
-          {providers.map((p, i) => (
-            <div className={`provider-node ${p.enabled ? '' : 'disabled'}`} key={p.id}>
-              <span className={`provider-mark ${providerClass[p.id]}`}>
-                {p.id === 'atlas' ? (
-                  <span className="atlas-logo">Λ</span>
-                ) : p.id === 'pulse' ? (
-                  <Zap size={17} />
-                ) : (
-                  <span className="harbor-logo">H</span>
-                )}
+      <ol className="routing-summary">
+        {providers.map((p, i) => (
+          <li key={p.id}>
+            <span className="route-rank">{i + 1}</span>
+            <div>
+              <strong>{p.name}</strong>
+              <span>
+                {i === 0 ? 'Primary provider' : `Fallback ${i}`} · {(p.feeBps / 100).toFixed(1)}% +{' '}
+                {p.fixedFeeMinor}¢
               </span>
-              <div>
-                <strong>{p.name}</strong>
-                <span>{i === 0 ? 'Primary' : `Fallback ${i}`}</span>
-              </div>
-              <span className={`provider-state ${p.outage ? 'down' : !p.enabled ? 'off' : ''}`} />
             </div>
-          ))}
-        </div>
-      </div>
-      <div className="topology-legend">
-        <span>
-          <i className="legend-line" />
-          Primary route
-        </span>
-        <span>
-          <i className="legend-line dashed" />
-          Fallback route
-        </span>
-        <span className="topology-healthy">
-          <i />
-          {enabled === 3 ? 'All providers operational' : `${enabled} providers available`}
-        </span>
-      </div>
+            <span
+              className={`status-badge ${!p.enabled ? 'disabled' : p.outage ? 'failed' : 'succeeded'}`}
+            >
+              <i />
+              {!p.enabled ? 'Disabled' : p.outage ? 'Outage' : 'Available'}
+            </span>
+          </li>
+        ))}
+      </ol>
       <div className="route-insight">
-        <div className="insight-icon">
-          <GitBranch size={16} />
-        </div>
-        <p>
-          <strong>Automatic failover, by design.</strong> Unavailable providers trigger the next
-          route. Hard declines stop safely.
-        </p>
-        <ShieldCheck size={19} />
+        <ShieldCheck size={18} />
+        <p>Retry on provider unavailability. A hard decline stops the payment without retrying.</p>
       </div>
       <div className="latest-route">
-        <span>LAST ROUTE</span>
+        <span>Latest payment</span>
         <code>{shortId(latest.id)}</code>
         <span>
           {latest.attempts
             .map((a) => providers.find((p) => p.id === a.providerId)?.name)
             .join(' → ') || 'No enabled providers'}
         </span>
-        <span className={`mini-status ${latest.status === 'succeeded' ? 'green' : 'amber'}`}>
-          {latest.status === 'succeeded' ? <Check size={12} /> : <AlertCircle size={12} />}{' '}
-          {latest.status}
-        </span>
+        <Status status={latest.status} />
       </div>
     </section>
   );
@@ -779,6 +711,10 @@ function Simulator({
   async function submit(e: FormEvent) {
     e.preventDefault();
     setLocalError('');
+    if (!can('simulate')) {
+      setLocalError('Editor or owner access is required to simulate payments.');
+      return;
+    }
     const ok = await onRun({ type: 'simulate', amount, currency, scenario, reference, key });
     if (ok) setRan(true);
   }
@@ -792,141 +728,153 @@ function Simulator({
             </span>
             Payment simulator
           </h2>
-          <p>Put your routing through its paces.</p>
+          <p>Create a synthetic payment and inspect the result.</p>
         </div>
-        <span className="pill indigo">TEST MODE</span>
+        <span className="pill indigo">SANDBOX</span>
       </div>
+      {!can('simulate') && (
+        <p className="permission-note">Viewer access: payments are read only.</p>
+      )}
       <form onSubmit={submit}>
-        <label>
-          Amount
-          <div className="amount-input">
-            <span>{currency === 'EUR' ? '€' : '$'}</span>
-            <input
-              aria-label="Payment amount"
-              inputMode="decimal"
-              value={amount}
-              onChange={(e) => {
-                setAmount(e.target.value);
-                setRan(false);
-              }}
-              required
-            />
+        <fieldset disabled={busy || !can('simulate')}>
+          <label>
+            Amount
+            <div className="amount-input">
+              <span>{currency === 'EUR' ? '€' : '$'}</span>
+              <input
+                aria-label="Payment amount"
+                inputMode="decimal"
+                value={amount}
+                onChange={(e) => {
+                  setAmount(e.target.value);
+                  setRan(false);
+                }}
+                required
+              />
+              <select
+                aria-label="Payment currency"
+                value={currency}
+                onChange={(e) => {
+                  setCurrency(e.target.value as Currency);
+                  setRan(false);
+                }}
+              >
+                {currencies.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+          </label>
+          <label>
+            Test scenario
             <select
-              aria-label="Payment currency"
-              value={currency}
+              className="full-select"
+              value={scenario}
               onChange={(e) => {
-                setCurrency(e.target.value as Currency);
+                setScenario(e.target.value as Scenario);
                 setRan(false);
               }}
             >
-              {currencies.map((c) => (
-                <option key={c}>{c}</option>
+              {Object.entries(scenarioNames).map(([value, name]) => (
+                <option key={value} value={value}>
+                  {name}
+                </option>
               ))}
             </select>
+          </label>
+          <div className="scenario-description">
+            {scenario === 'success' ? (
+              <>
+                <CheckCircle2 size={14} />
+                <span>Approved by the first available provider.</span>
+              </>
+            ) : scenario === 'primary_outage' ? (
+              <>
+                <GitBranch size={14} />
+                <span>First enabled provider times out. Try the next.</span>
+              </>
+            ) : scenario === 'hard_decline' ? (
+              <>
+                <ShieldCheck size={14} />
+                <span>Terminal decline. Never retry this payment.</span>
+              </>
+            ) : (
+              <>
+                <AlertCircle size={14} />
+                <span>All enabled routes time out. Payment fails.</span>
+              </>
+            )}
           </div>
-        </label>
-        <label>
-          Test scenario
-          <select
-            className="full-select"
-            value={scenario}
-            onChange={(e) => {
-              setScenario(e.target.value as Scenario);
-              setRan(false);
-            }}
-          >
-            {Object.entries(scenarioNames).map(([value, name]) => (
-              <option key={value} value={value}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="scenario-description">
-          {scenario === 'success' ? (
-            <>
-              <CheckCircle2 size={14} />
-              <span>Approved by the first available provider.</span>
-            </>
-          ) : scenario === 'primary_outage' ? (
-            <>
-              <GitBranch size={14} />
-              <span>First enabled provider times out. Try the next.</span>
-            </>
-          ) : scenario === 'hard_decline' ? (
-            <>
-              <ShieldCheck size={14} />
-              <span>Terminal decline. Never retry this payment.</span>
-            </>
-          ) : (
-            <>
-              <AlertCircle size={14} />
-              <span>All enabled routes time out. Payment fails.</span>
-            </>
-          )}
-        </div>
-        <button type="button" className="advanced-toggle" onClick={() => setAdvanced(!advanced)}>
-          <SlidersHorizontal size={13} />
-          Request details
-          <ChevronDown size={13} className={advanced ? 'rotate' : ''} />
-          <span>Idempotency & reference</span>
-        </button>
-        {advanced && (
-          <div className="advanced-fields">
-            <label>
-              Reference
-              <input
-                value={reference}
-                maxLength={80}
-                onChange={(e) => {
-                  setReference(e.target.value);
-                  setRan(false);
-                }}
-              />
-            </label>
-            <label>
-              Idempotency key
-              <div className="key-field">
+          <button type="button" className="advanced-toggle" onClick={() => setAdvanced(!advanced)}>
+            <SlidersHorizontal size={13} />
+            Request details
+            <ChevronDown size={13} className={advanced ? 'rotate' : ''} />
+            <span>Idempotency & reference</span>
+          </button>
+          {advanced && (
+            <div className="advanced-fields">
+              <label>
+                Reference
                 <input
-                  value={key}
-                  required
-                  minLength={8}
-                  maxLength={128}
+                  value={reference}
+                  maxLength={80}
                   onChange={(e) => {
-                    setKey(e.target.value);
+                    setReference(e.target.value);
                     setRan(false);
                   }}
                 />
-                <button
-                  type="button"
-                  className="icon-button"
-                  aria-label="Generate a new idempotency key"
-                  onClick={() => {
-                    setKey(newKey());
-                    setRan(false);
-                  }}
-                >
-                  <RefreshCw size={13} />
-                </button>
-              </div>
-            </label>
-            <small>
-              Same request + same key returns the original payment. Changed request + same key is
-              rejected.
-            </small>
-          </div>
-        )}
-        {localError && <p className="form-error">{localError}</p>}
-        <button className="button primary simulate-button" disabled={busy} type="submit">
-          {busy ? (
-            <LoaderCircle size={15} className="spin" />
-          ) : (
-            <Play size={14} fill="currentColor" />
+              </label>
+              <label>
+                Idempotency key
+                <div className="key-field">
+                  <input
+                    value={key}
+                    required
+                    minLength={8}
+                    maxLength={128}
+                    onChange={(e) => {
+                      setKey(e.target.value);
+                      setRan(false);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label="Generate a new idempotency key"
+                    onClick={() => {
+                      setKey(newKey());
+                      setRan(false);
+                    }}
+                  >
+                    <RefreshCw size={13} />
+                  </button>
+                </div>
+              </label>
+              <small>
+                Same request + same key returns the original payment. Changed request + same key is
+                rejected.
+              </small>
+            </div>
           )}
-          {busy ? 'Processing simulation…' : ran ? 'Replay this payment' : 'Simulate payment'}
-          <span>↵</span>
-        </button>
-        {ran && (
+          {localError && <p className="form-error">{localError}</p>}
+          <button
+            className="button primary simulate-button"
+            disabled={busy || !can('simulate')}
+            type="submit"
+          >
+            {busy ? (
+              <LoaderCircle size={15} className="spin" />
+            ) : (
+              <Play size={14} fill="currentColor" />
+            )}
+            {!can('simulate')
+              ? 'Read-only access'
+              : busy
+                ? 'Processing simulation…'
+                : ran
+                  ? 'Replay this payment'
+                  : 'Simulate payment'}
+          </button>
           <button
             className="text-button new-payment"
             type="button"
@@ -938,11 +886,11 @@ function Simulator({
             <Plus size={13} />
             New payment key
           </button>
-        )}
-        <p className="simulator-foot">
-          <ShieldCheck size={12} />
-          Synthetic funds only. No card details needed.
-        </p>
+          <p className="simulator-foot">
+            <ShieldCheck size={12} />
+            Synthetic funds only. No card details needed.
+          </p>
+        </fieldset>
       </form>
     </section>
   );
@@ -1083,7 +1031,9 @@ function TransactionTable({
                       {p.attempts.length} attempts
                     </span>
                   ) : (
-                    <span className="direct-route">Direct</span>
+                    <span className="direct-route">
+                      {p.attempts.length === 0 ? 'No route' : 'Direct'}
+                    </span>
                   )}
                 </td>
                 <td className="mono muted">
@@ -1198,7 +1148,7 @@ function ProviderCard({
         <div className="priority-arrows">
           <button
             className="icon-button"
-            disabled={busy || index === 0}
+            disabled={busy || !can('route') || index === 0}
             onClick={() => onMove(-1)}
             aria-label={`Move ${p.name} up`}
           >
@@ -1206,7 +1156,7 @@ function ProviderCard({
           </button>
           <button
             className="icon-button"
-            disabled={busy || index === 2}
+            disabled={busy || !can('route') || index === 2}
             onClick={() => onMove(1)}
             aria-label={`Move ${p.name} down`}
           >
@@ -1222,7 +1172,7 @@ function ProviderCard({
             aria-checked={p.enabled}
             aria-label={`Enable ${p.name}`}
             className={`toggle ${p.enabled ? 'on' : ''}`}
-            disabled={busy}
+            disabled={busy || !can('provider')}
             onClick={() => onChange(!p.enabled, p.outage)}
           >
             <span />
@@ -1235,7 +1185,7 @@ function ProviderCard({
             aria-checked={p.outage}
             aria-label={`Simulate ${p.name} outage`}
             className={`toggle ${p.outage ? 'outage' : ''}`}
-            disabled={busy}
+            disabled={busy || !can('provider')}
             onClick={() => onChange(p.enabled, !p.outage)}
           >
             <span />
@@ -1272,6 +1222,12 @@ function ReconciliationView({
   const r = state.reconciliation;
   return (
     <>
+      {!can('reconcile') && (
+        <p className="permission-note">
+          Viewer access: view existing results. Editor or owner access is required to run
+          reconciliation.
+        </p>
+      )}
       <div className="recon-summary">
         <div className="panel recon-summary-item">
           <span className="recon-icon green">
@@ -1315,14 +1271,14 @@ function ReconciliationView({
               <div className="file-symbol">
                 <FileCheck2 size={24} />
               </div>
-              <h3>Start with a seeded statement</h3>
+              <h3>Demo settlement statement</h3>
               <p>
                 A synthetic statement with one missing payment, one amount mismatch and one
                 duplicate. Inspect what reconciliation catches.
               </p>
               <button
                 className="button primary"
-                disabled={busy}
+                disabled={busy || !can('reconcile')}
                 onClick={async () => {
                   await onCommand({ type: 'reconcile', demo: true });
                 }}
@@ -1353,6 +1309,7 @@ function ReconciliationView({
               Statement contents
               <textarea
                 aria-label="Settlement statement CSV"
+                disabled={!can('reconcile')}
                 spellCheck={false}
                 value={csv}
                 placeholder={'transaction_id,amount_minor,currency\npay_000001,12900,AUD'}
@@ -1365,6 +1322,7 @@ function ReconciliationView({
                 <Plus size={14} />
                 Import CSV
                 <input
+                  disabled={!can('reconcile')}
                   type="file"
                   accept=".csv,text/csv"
                   onChange={async (e) => {
@@ -1381,7 +1339,7 @@ function ReconciliationView({
               </label>
               <button
                 className="button secondary"
-                disabled={busy || !csv.trim()}
+                disabled={busy || !can('reconcile') || !csv.trim()}
                 onClick={() => void onCommand({ type: 'reconcile', csv })}
               >
                 Reconcile statement
@@ -1429,7 +1387,7 @@ function ReconciliationView({
                   <Search size={18} />
                 </span>
               </div>
-              <h3>Every cent accounted for.</h3>
+              <h3>No reconciliation results yet</h3>
               <p>
                 Run reconciliation to find gaps between your payment ledger and settlement
                 statement.
@@ -1659,24 +1617,20 @@ function Guide() {
         <span className="guide-icon">
           <Code2 size={27} />
         </span>
-        <span className="pill indigo">BUILT TO BE EXPLORED</span>
-        <h2>
-          Payment systems,
-          <br />
-          without the real money.
-        </h2>
+        <span className="pill indigo">SANDBOX DOCUMENTATION</span>
+        <h2>Payment workspace guide</h2>
         <p>
-          PayRoute is a working engineering sandbox for the decisions that sit between a payment
-          request and its final settlement.
+          Use this workspace to test synthetic payment routing, inspect retry decisions and compare
+          settlement records.
         </p>
         <div>
           <a
             className="button primary"
-            href="https://github.com/tanveerchana"
+            href="https://github.com/tanveerchana/payroute-sandbox"
             target="_blank"
             rel="noreferrer"
           >
-            Explore GitHub
+            Source on GitHub
             <ArrowUpRight size={15} />
           </a>
           <a
@@ -1685,7 +1639,7 @@ function Guide() {
             target="_blank"
             rel="noreferrer"
           >
-            Meet the builder
+            Author portfolio
             <ArrowUpRight size={15} />
           </a>
         </div>
@@ -1720,7 +1674,10 @@ function Guide() {
         <div className="panel-heading">
           <div>
             <h2>Workspace command</h2>
-            <p>A local sandbox token isolates each browser workspace.</p>
+            <p>
+              Signed-in workspaces use account sessions. Demo workspaces use an isolated browser
+              token.
+            </p>
           </div>
           <Terminal size={18} />
         </div>
@@ -1735,19 +1692,20 @@ function Guide() {
         </pre>
         <div className="code-foot">
           <ShieldCheck size={14} />
-          Bearer token required · 200 payments per workspace · No live mode
+          Account session or demo token required · 200 payments per workspace · No live mode
         </div>
       </section>
       <section className="panel guide-boundaries">
-        <h2>Honest by construction.</h2>
+        <h2>Data and access</h2>
         <p>
           Metrics come from the current synthetic ledger. Volume is scoped to your selected
           currency. Fees apply only to successful payments, using each provider’s disclosed
           synthetic rate.
         </p>
         <p>
-          The workspace is isolated by a random 256-bit browser token. This portfolio demo has no
-          user accounts, live card processing, real settlement or production payment guarantees.
+          Signed-in workspace access is controlled by owner, editor and viewer roles. Guest demos
+          use an isolated random browser token. All payments remain synthetic; there is no live card
+          processing or real settlement.
         </p>
         <span className="pill green">
           <Check size={12} />

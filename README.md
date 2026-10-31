@@ -15,7 +15,8 @@ A payment orchestration lab by [Tanveer Singh](https://singhtanveer.com). Route 
 - Actual settlement CSV comparison: missing, duplicate, unexpected, currency mismatch and amount mismatch exceptions. The demo statement intentionally contains three exceptions.
 - Currency-scoped processed volume, authorization rate, recovered payments and simulated latency calculated from the workspace ledger.
 - Search, status filters, payment detail timeline, responsive navigation, provider configuration, CSV and JSON exports, explicit reset and visible persistence errors.
-- An isolated browser workspace seeded with 36 synthetic payments, capped at 200 to preserve idempotency history without unbounded storage.
+- Sign in or sign up for account workspaces, select a workspace and manage team access. An explicit **Try demo** option opens an isolated guest sandbox.
+- Owner, editor and viewer roles with independent server authorization. Each workspace is seeded with 36 synthetic payments and capped at 200 to preserve idempotency history.
 
 ## Stack
 
@@ -31,7 +32,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open `http://localhost:5103`. The Vite development server includes the same workspace API handler used on Vercel. The two environment variables are server-side only. A configured database is required; the UI reports storage errors and never pretends local data was persisted. [Persistence setup and RLS verification](docs/persistence.md) describe the shared capability model and migration checks.
+Open `http://localhost:5103`. The Vite development server includes the same workspace, authentication and team API handlers used on Vercel. The two environment variables are server-side only. A configured database is required; the UI reports storage errors and never pretends local data was persisted. [Persistence setup and RLS verification](docs/persistence.md) describe the shared capability model and migration checks.
 
 ```bash
 npm test             # domain, token lifecycle and persistence/API contracts
@@ -63,9 +64,9 @@ Settlement CSV uses exactly `transaction_id,amount_minor,currency`. Maximum 500 
 
 ## Explicit limitations
 
-This is a portfolio demonstration, not a production payment product. Providers and fees are fictional. Latency is deterministic modeled latency, not elapsed wall-clock time; timestamps advance along a fixed synthetic demo clock beginning 30 October 2026 at 08:00 UTC. Processing is synchronous and no real settlement occurs. No circuit breaker, fraud scoring, currency conversion, bank integration, card processing, user accounts or financial compliance guarantees are implemented.
+This is a portfolio demonstration, not a production payment product. Providers and fees are fictional. Latency is deterministic modeled latency, not elapsed wall-clock time; timestamps advance along a fixed synthetic demo clock beginning 30 October 2026 at 08:00 UTC. Processing is synchronous and no real settlement occurs. No circuit breaker, fraud scoring, currency conversion, bank integration, card processing or financial compliance guarantees are implemented.
 
-Workspace access is a random 256-bit bearer capability kept in browser local storage. Anyone with the token can access that workspace. Do not store sensitive data. Database access expires after seven days and the browser rotates its token after six days, starting a new seeded workspace. Resetting a sandbox restores the seed and clears its idempotency history. At 200 payments, new requests are rejected until reset; existing-key replays continue to work.
+Account workspaces use cookie sessions and membership roles. Owners manage providers, route priority, resets and team access; editors simulate payments and run reconciliation; viewers inspect and export data. Account credentials are not stored in localStorage. All account workspaces still contain synthetic portfolio data. Guest demo access uses a random 256-bit bearer capability in localStorage; anyone possessing a demo token can access that demo workspace. Demo access expires after seven days and the browser rotates its token after six days, starting a new seeded workspace. Do not store sensitive data. Resetting a sandbox restores the seed and clears its idempotency history. At 200 payments, new requests are rejected until reset; existing-key replays continue to work.
 
 See [design](docs/design.md), [implementation plan](docs/implementation-plan.md) and [test coverage](docs/testing.md).
 
