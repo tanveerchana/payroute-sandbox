@@ -1,6 +1,6 @@
 # Verification record
 
-Verified on 31 October 2026. This is an engineering portfolio demo using synthetic data.
+Local and database checks recorded on 31 October 2026; hosted demo workflow rechecked on 2 November 2026. This is an engineering portfolio demo using synthetic data.
 
 ## Local quality checks
 
@@ -11,11 +11,18 @@ Verified on 31 October 2026. This is an engineering portfolio demo using synthet
 
 The checked-in GitHub Actions workflow runs installation, tests, types, formatting and a production build on pushes and pull requests. It does not deploy or receive production credentials.
 
-## Earlier hosted demo workflow check
+## Hosted demo workflow check — 2 November 2026
 
-In the hosted browser, a primary-provider outage routed a synthetic AUD120.50 payment from Atlas to Pulse. Replaying the same payment kept the ledger at 37 rows and reused its original attempts. Demo reconciliation returned 31 matches and three exceptions: missing, duplicate and amount mismatch. No funds moved.
+Tested in a new browser tab at https://payroute-sandbox.vercel.app/ using the visible UI. The initial account gate showed Log in, Create account and Try demo. Try demo opened a connected synthetic workspace with 36 transactions.
 
-Live demo: https://payroute-sandbox.vercel.app
+- Simulated AUD120.50 with reference `Hosted QA 2026-11-02` and the Primary provider outage scenario. The resulting payment was `pay_000037` (shown in the ledger as `py_000037`): Atlas reported provider unavailable after 819 ms; Pulse approved after 197 ms. The timeline showed two attempts and 1,016 ms total latency. The ledger increased to 37 transactions.
+- Replayed the unchanged request using the same idempotency key, `sim_20e4daf3d0df4c5b94e3`. The original payment, two attempts and timings were returned; the ledger remained at 37 transactions.
+- Ran demo reconciliation. It processed 34 statement records against 37 payments, with 31 matches and three exceptions: duplicate `pay_000003`, missing `pay_000001`, and amount mismatch `pay_000002` (expected 24950 minor units; statement contained 25050).
+- Reloaded the page. The connected demo workspace retained 37 transactions, the AUD120.50 payment, its reference and original two-attempt routing timeline. Reconciliation retained the same 31 matches and three exceptions.
+
+`docs/preview.jpg` is a fresh hosted screenshot of the payment details and original routing timeline after reload. No real funds moved. This check used Try demo; real signup email delivery and the complete provider signup/confirmation/login journey remain unverified.
+
+Live demo: https://payroute-sandbox.vercel.app/
 
 ## Account security verification
 
